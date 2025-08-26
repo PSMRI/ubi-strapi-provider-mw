@@ -72,7 +72,7 @@ export class BenefitsService {
 	async getBenefits(body: SearchBenefitsDto, req: Request): Promise<any> {
 		const authToken = getAuthToken(req);
 		const page = body?.page ?? '1';
-		const pageSize = body?.pageSize ?? '100';
+		const pageSize = body?.pageSize ?? '1000';
 		const sort = body?.sort ?? 'createdAt:desc';
 		const locale = body?.locale ?? 'en';
 		const filters = body?.filters ?? {};
