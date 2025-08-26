@@ -77,20 +77,12 @@ export class BenefitsService {
 		const locale = body?.locale ?? 'en';
 		const filters = body?.filters ?? {};
 
-		// Add filter for published benefits
-		const publishedFilters = {
-			...filters,
-			publishedAt: {
-				$notNull: true,
-			},
-		};
-
 		const queryParams = {
 			page,
 			pageSize,
 			sort,
 			locale,
-			filters: publishedFilters,
+			filters,
 		};
 
 		const queryString = qs.stringify(queryParams, {
@@ -110,6 +102,13 @@ export class BenefitsService {
 		const response = await this.httpService.axiosRef.get(url, {
 			headers,
 		});
+
+		// Filter benefits to only include published ones
+		if (response?.data?.results) {
+			response.data.results = response.data.results.filter(
+				(benefit: any) => benefit.status === 'published'
+			);
+		}
 
 		// Check if the response contains results
 		if (response?.data?.results.length > 0) {
