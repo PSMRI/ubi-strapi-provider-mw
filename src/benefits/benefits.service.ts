@@ -103,6 +103,13 @@ export class BenefitsService {
 			headers,
 		});
 
+		// Filter benefits to only include published ones
+		if (response?.data?.results) {
+			response.data.results = response.data.results.filter(
+				(benefit: any) => benefit.status === 'published'
+			);
+		}
+
 		// Check if the response contains results
 		if (response?.data?.results.length > 0) {
 			const enrichedData = await Promise.all(
