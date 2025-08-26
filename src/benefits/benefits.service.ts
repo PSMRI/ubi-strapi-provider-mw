@@ -77,12 +77,20 @@ export class BenefitsService {
 		const locale = body?.locale ?? 'en';
 		const filters = body?.filters ?? {};
 
+		// Add filter for published benefits
+		const publishedFilters = {
+			...filters,
+			publishedAt: {
+				$notNull: true,
+			},
+		};
+
 		const queryParams = {
 			page,
 			pageSize,
 			sort,
 			locale,
-			filters,
+			filters: publishedFilters,
 		};
 
 		const queryString = qs.stringify(queryParams, {
