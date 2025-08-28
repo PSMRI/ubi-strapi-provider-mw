@@ -25,9 +25,6 @@ if (process.env.NODE_ENV === 'test' || !process.env.SENTRY_DSN) {
 
 		// Additional configuration options
 		debug: process.env.NODE_ENV === 'development',
-
-		// Add any additional integrations here
-		integrations: [],
 	});
 }
 
