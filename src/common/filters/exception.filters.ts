@@ -109,12 +109,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
                     });
                 }
 
-                // Add request context
+                // Add request context - Sentry automatically scrubs sensitive data
                 scope.setContext('request', {
                     url: request.url,
                     method: request.method,
-                    headers: this.sanitizeHeaders(request.headers),
-                    body: this.sanitizeBody(request.body),
+                    headers: request.headers,
+                    body: request.body,
                     query: request.query,
                     params: request.params,
                 });
@@ -167,46 +167,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
                 error: sentryError.message 
             });
         }
-    }
-
-    private sanitizeHeaders(headers: any): any {
-        const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'x-auth-token'];
-        const sanitized = { ...headers };
-        
-        Object.keys(sanitized).forEach(key => {
-            if (sensitiveHeaders.includes(key.toLowerCase())) {
-                sanitized[key] = '[REDACTED]';
-            }
-        });
-        
-        return sanitized;
-    }
-
-    private sanitizeBody(body: any): any {
-        if (!body || typeof body !== 'object') return body;
-        
-        const sensitiveFields = ['password', 'token', 'secret', 'key', 'authorization'];
-        const sanitized = { ...body };
-        
-        const sanitizeObject = (obj: any): any => {
-            if (typeof obj !== 'object' || obj === null) return obj;
-            
-            const result = Array.isArray(obj) ? [] : {};
-            
-            Object.keys(obj).forEach(key => {
-                if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
-                    result[key] = '[REDACTED]';
-                } else if (typeof obj[key] === 'object') {
-                    result[key] = sanitizeObject(obj[key]);
-                } else {
-                    result[key] = obj[key];
-                }
-            });
-            
-            return result;
-        };
-        
-        return sanitizeObject(sanitized);
     }
 
     catch(
