@@ -1,5 +1,7 @@
 import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { AuthMiddleware } from './common/middlewares/auth.middleware';
+import { AllExceptionsFilter } from './common/filters/exception.filters';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
@@ -29,7 +31,11 @@ import { EligibilityStatusUpdate } from './applications/crons/check-eligibility-
     AppService,
     PrismaService,
     ApplicationStatusUpdate,
-    EligibilityStatusUpdate
+    EligibilityStatusUpdate,
+    {
+      provide: APP_FILTER,
+      useFactory: () => new AllExceptionsFilter('ubi-provider-mw'),
+    },
   ],
 })
 export class AppModule {
