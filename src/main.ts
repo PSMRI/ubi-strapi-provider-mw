@@ -2,8 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
+import * as Sentry from "@sentry/nestjs"
+
 
 async function bootstrap() {
+
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.SENTRY_ENVIRONMENT,
+
+    // Setting this option to true will send default PII data to Sentry.
+    // For example, automatic IP address collection on events
+    sendDefaultPii: true,
+  });
+
   const app = await NestFactory.create(AppModule);
 
   // Increase the request body size limit

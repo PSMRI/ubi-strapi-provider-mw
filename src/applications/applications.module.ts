@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma.service';
 import { BenefitsModule } from '../benefits/benefits.module';
 import { AclModule } from '../common/service/acl.module';
 import { StorageProviderModule } from '../services/storage-providers/storage-provider.module';
+import { VerificationsModule } from '../verifications/verifications.module';
 
 @Module({
   controllers: [ApplicationsController],
@@ -14,7 +15,8 @@ import { StorageProviderModule } from '../services/storage-providers/storage-pro
     HttpModule,
     forwardRef(() => BenefitsModule),
     forwardRef(() => AclModule),
-    StorageProviderModule
+    StorageProviderModule,
+    forwardRef(() => VerificationsModule)
   ],
   providers: [ApplicationsService, ConfigService, PrismaService],
   exports: [ApplicationsService],

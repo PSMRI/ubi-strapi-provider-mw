@@ -6,11 +6,9 @@ import { LocalStorageAdapter } from './adapters/local-storage.adapter';
 @Module({
   imports: [ConfigModule],
   providers: [
-    S3StorageAdapter,
-    LocalStorageAdapter,
     {
       provide: 'FileStorageService',
-      useFactory: (configService: ConfigService, s3Adapter: S3StorageAdapter, localAdapter: LocalStorageAdapter) => {
+      useFactory: (configService: ConfigService) => {
         const provider = configService.get<string>('FILE_STORAGE_PROVIDER');
         if (provider === 's3') {
           // Validate S3 configuration
@@ -19,14 +17,14 @@ import { LocalStorageAdapter } from './adapters/local-storage.adapter';
           if (missingConfig.length > 0) {
             throw new Error(`Missing S3 configuration: ${missingConfig.join(', ')}`);
           }
-          return s3Adapter;
+          return new S3StorageAdapter();
         } else if (provider === 'local' || !provider) {
-          return localAdapter;
+          return new LocalStorageAdapter();
         } else {
           throw new Error(`Invalid FILE_STORAGE_PROVIDER: ${provider}. Must be 's3' or 'local'`);
         }
       },
-      inject: [ConfigService, S3StorageAdapter, LocalStorageAdapter],
+      inject: [ConfigService],
     },
   ],
   exports: ['FileStorageService'],

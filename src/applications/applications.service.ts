@@ -4,7 +4,7 @@ import {
 	NotFoundException,
 	forwardRef,
 	BadRequestException,
-	UnauthorizedException,
+	UnauthorizedException
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { Prisma, ApplicationFiles } from '@prisma/client';
@@ -34,6 +34,7 @@ type ApplicationData = Record<string, any>;
 @Injectable()
 export class ApplicationsService {
 	private readonly eligibility_base_uri: string;
+	
 	constructor(
 		private readonly prisma: PrismaService,
 		@Inject(forwardRef(() => BenefitsService))
@@ -42,7 +43,7 @@ export class ApplicationsService {
 		private readonly configService: ConfigService,
 		private readonly aclService: AclService,
 		@Inject('FileStorageService')
-		private readonly fileStorageService: IFileStorageService,
+		private readonly fileStorageService: IFileStorageService
 	) {
 		const url = this.configService.get('ELIGIBILITY_API_URL');
 		if (!url) {
@@ -69,14 +70,14 @@ export class ApplicationsService {
 		return `${basePath}/${certificateType}/${fileName}`;
 	}
 
-	// Create a new application
+	// Create a new application (new VC documents format only)
 	async create(data: any) {
-		// Step 1: Split fields into base64-encoded files and normal data
-		const { base64Fields, normalFields } = this.splitFields(data);
+		// Step 1: Process new VC documents format (validation handled by DTO)
+		const { vcDocuments, applicationFields } = this.processNewFormat(data);
 
 		// Step 2: Extract required identifiers
 		const benefitId = data.benefitId;
-		if (!benefitId) throw new Error('benefitId is required');
+		if (!benefitId) throw new BadRequestException('benefitId is required');
 
 		const bapId = data.bapId ?? data.bapid ?? data.bapID ?? null;
 		const orderId = data.orderId ?? null;
@@ -86,19 +87,33 @@ export class ApplicationsService {
 			orderId,
 			benefitId,
 			bapId,
-			normalFields,
+			normalFields: applicationFields,
 		});
 
 		// Step 4: Determine whether it was an update or a new creation
-
 		const applicationId = application.id;
 
-		// Step 5: Handle file uploads
-		const applicationFiles = await this.processBase64Files(
+		// Step 5: Handle VC document uploads (can be empty array)
+		const applicationFiles = await this.processApplicationFiles(
 			applicationId,
-			base64Fields,
-		);
-
+			vcDocuments,
+		);	
+		
+		if(isUpdate){
+			await this.prisma.applications.update({
+				where: { id: applicationId },
+				data: {
+					calculatedAmount: Prisma.DbNull,
+					calculationsProcessedAt: null,
+					eligibilityCheckedAt: null,
+					eligibilityResult: Prisma.DbNull,
+					eligibilityStatus: 'pending',
+					documentVerificationStatus: null,
+					updatedAt: new Date(),
+				},
+			});
+		}
+		
 		// Step 6: Return result
 		return {
 			application,
@@ -110,24 +125,42 @@ export class ApplicationsService {
 	}
 
 	/**
-	 * Splits the incoming data into two parts:
-	 * - base64Fields: for documents that need to be uploaded
-	 * - normalFields: other application data
+	 * Processes new VC documents format (vc_documents array can be empty, validation handled by DTO)
 	 */
-	private splitFields(data: any) {
-		const base64Fields: { key: string; value: string }[] = [];
-		const normalFields: Record<string, any> = {};
+	private processNewFormat(data: any) {
+		const vcDocuments: { key: string; value: string; metadata: any }[] = [];
+		const applicationFields: Record<string, any> = {};
 
+		// Extract vc_documents (validation and transformation already done by DTO)
+		data.vc_documents.forEach((doc: any, index: number) => {
+			vcDocuments.push({
+				key: `vc_document_${index}`,
+				value: doc.document_content,
+				metadata: {
+					document_submission_reason: doc.document_submission_reason,
+					document_subtype: doc.document_subtype,
+					document_type: doc.document_type,
+				}
+			});
+		});
+
+		// Extract all other fields as application data (excluding control fields)
+		const excludeFields = ['vc_documents', 'benefitId', 'orderId', 'bapId', 'status', 'applicationData', 'customerId'];
 		for (const [key, value] of Object.entries(data)) {
-			if (typeof value === 'string' && value.startsWith('base64,')) {
-				base64Fields.push({ key, value });
-			} else {
-				normalFields[key] = value;
+			if (!excludeFields.includes(key) && !key.startsWith('_') && value !== undefined) {
+				applicationFields[key] = value;
 			}
 		}
 
-		return { base64Fields, normalFields };
+		// If applicationData is provided, merge it with extracted fields
+		if (data.applicationData && typeof data.applicationData === 'object') {
+			Object.assign(applicationFields, data.applicationData);
+		}
+
+		return { vcDocuments, applicationFields };
 	}
+
+
 	/**
 	 * Checks if an application with the given orderId exists.
 	 * - If yes: updates the application and deletes old files
@@ -155,6 +188,27 @@ export class ApplicationsService {
 					where: { applicationId: existing.id },
 				});
 
+				// Create action log entry for resubmit
+				const actionLogEntry = this.getActionLogEntry(
+					{
+						os: normalFields.os || 'Unknown',
+						browser: normalFields.browser || 'Unknown',
+						updatedBy: normalFields.updatedBy || 0,
+						ip: normalFields.ip || 'Unknown',
+						updatedAt: new Date(),
+					},
+					'application_resubmitted',
+					null
+				);
+
+				// Update existing action log or create new one
+				let updatedActionLog;
+				if (existing.actionLog && Array.isArray(existing.actionLog)) {
+					updatedActionLog = [...existing.actionLog, actionLogEntry];
+				} else {
+					updatedActionLog = [actionLogEntry];
+				}
+
 				const updated = await this.prisma.applications.update({
 					where: { id: existing.id },
 					data: {
@@ -164,6 +218,7 @@ export class ApplicationsService {
 						remark: null,
 						updatedAt: new Date(),
 						status: 'pending',
+						actionLog: updatedActionLog,
 					},
 				});
 				return { application: updated, isUpdate: true };
@@ -172,6 +227,20 @@ export class ApplicationsService {
 
 		// Create new application if no existing one found
 		const customerId = uuidv4();
+		
+		// Create action log entry for new submission
+		const actionLogEntry = this.getActionLogEntry(
+			{
+				os: normalFields.os || 'Unknown',
+				browser: normalFields.browser || 'Unknown',
+				updatedBy: normalFields.updatedBy || 0,
+				ip: normalFields.ip || 'Unknown',
+				updatedAt: new Date(),
+			},
+			'application_submitted',
+			null
+		);
+
 		const created = await this.prisma.applications.create({
 			data: {
 				benefitId,
@@ -180,23 +249,24 @@ export class ApplicationsService {
 				bapId,
 				applicationData: JSON.stringify(normalFields),
 				orderId,
+				actionLog: [actionLogEntry],
 			},
 		});
 		return { application: created, isUpdate: false };
 	}
 	/**
-	 * Handles processing of base64 files:
+	 * Handles processing of application files (both legacy base64 and new VC documents):
 	 * - Decodes content
 	 * - Uploads to storage
-	 * - Saves record in database
+	 * - Saves record in database with proper metadata
 	 */
-	private async processBase64Files(
+	private async processApplicationFiles(
 		applicationId: number,
-		base64Fields: { key: string; value: string }[],
+		base64Fields: { key: string; value: string; metadata?: any }[],
 	) {
 		const applicationFiles: ApplicationFiles[] = [];
 
-		for (const { key, value } of base64Fields) {
+		for (const { key, value, metadata } of base64Fields) {
 			const decodedContent = this.decodeBase64(value);
 			const filePathWithPrefix = this.buildFilePath(String(applicationId), key);
 
@@ -220,15 +290,25 @@ export class ApplicationsService {
 			}
 
 			try {
+				// Prepare database record data
+				const fileData: any = {
+					storage: process.env.FILE_STORAGE_PROVIDER ?? 'local',
+					filePath: storageKey,
+					applicationId,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				};
+
+				// Add VC document metadata if available
+				if (metadata) {
+					fileData.documentSubmissionReason = metadata.document_submission_reason;
+					fileData.documentSubtype = metadata.document_subtype;
+					fileData.documentType = metadata.document_type;
+				}
+
 				// Save uploaded file info in applicationFiles table
 				const appFile = await this.prisma.applicationFiles.create({
-					data: {
-						storage: process.env.FILE_STORAGE_PROVIDER ?? 'local',
-						filePath: storageKey,
-						applicationId,
-						createdAt: new Date(),
-						updatedAt: new Date(),
-					},
+					data: fileData,
 				});
 				applicationFiles.push(appFile);
 			} catch (err) {
@@ -315,7 +395,19 @@ export class ApplicationsService {
 				'You do not have permission to view this application',
 			);
 		}
-
+		
+		try {
+			await this.calculateBenefit(id, authToken);
+		} catch (err) {
+			console.error(`Error checking amount for application ${id}:`, err.message);
+			// Continue with the response even if eligibility check fails
+		}
+		try {
+			await this.checkEligibility(id, req);
+		} catch (eligibilityError) {
+			console.error(`Error checking eligibility for application ${id}:`, eligibilityError.message);
+			// Continue with the response even if eligibility check fails
+		}
 		const application = await this.prisma.applications.findUnique({
 			where: { id },
 			include: {
@@ -464,7 +556,7 @@ export class ApplicationsService {
 	getActionLogEntry(
 		actionLog: UpdateApplicationActionLogDto,
 		status: string,
-		remark: string,
+		remark: string | null,
 	) {
 		return JSON.stringify({
 			...actionLog,
@@ -781,7 +873,9 @@ export class ApplicationsService {
 	}
 
 	async checkEligibility(applicationId: number, req: Request) {
-		const application = await this.findOne(applicationId, req); // Fetch the application by ID
+		const application = await this.prisma.applications.findUnique({
+			where: { id: applicationId },
+		});
 
 		if (!application) {
 			throw new NotFoundException(
@@ -789,15 +883,15 @@ export class ApplicationsService {
 			);
 		}
 
-		const benefitDefinition = await this.benefitsService.getBenefitsById(
+		const benefitDefinition = await this.benefitsService.getBenefitsByIdStrapi(
 			`${application.benefitId}`,
-			req,
 		);
 		if (!benefitDefinition?.data) {
 			throw new NotFoundException(
 				`Benefit with ID ${application.benefitId} not found`,
 			);
 		}
+		
 		const strictCheck = req?.query?.strictCheck === 'true';
 		const formatEligiblityPayload = await this.formatEligibility(
 			benefitDefinition,
@@ -809,6 +903,17 @@ export class ApplicationsService {
 			formatEligiblityPayload?.eligibilityRules,
 			formatEligiblityPayload?.strictCheck,
 		);
+		
+		// Calculate eligibility percentage and add it to userDetails
+		const eligibilityPercentage = this.calculateEligibilityPercentage(eligibilityResult);
+		
+		// Add percentage to the first user's details
+		if (eligibilityResult?.eligibleUsers?.[0]?.details) {
+			eligibilityResult.eligibleUsers[0].details.eligibilityPercentage = eligibilityPercentage;
+		} else if (eligibilityResult?.ineligibleUsers?.[0]?.details) {
+			eligibilityResult.ineligibleUsers[0].details.eligibilityPercentage = eligibilityPercentage;
+		}
+		
 		let eligibilityStatus = 'ineligible'; // Default status
 		if (eligibilityResult?.eligibleUsers?.length > 0) {
 			eligibilityStatus = 'eligible'; // Set to eligible if any users are eligible default we sending one application here
@@ -820,6 +925,31 @@ export class ApplicationsService {
 		});
 
 		return eligibilityResult;
+	}
+
+	/**
+	 * Calculates eligibility percentage based on criteria results
+	 * @param eligibilityResult - The eligibility check result
+	 * @returns number - Percentage of passed criteria (0-100)
+	 */
+	private calculateEligibilityPercentage(eligibilityResult: any): number {
+		// Get the first user's criteria results (since we're checking one application at a time)
+		const userDetails = eligibilityResult?.eligibleUsers?.[0]?.details || 
+						   eligibilityResult?.ineligibleUsers?.[0]?.details;
+		
+		if (!userDetails?.criteriaResults || !Array.isArray(userDetails.criteriaResults)) {
+			return 0;
+		}
+
+		const criteriaResults = userDetails.criteriaResults;
+		const totalCriteria = criteriaResults.length;
+		const passedCriteria = criteriaResults.filter(criteria => Boolean(criteria.passed)).length;
+		
+		// Calculate percentage
+		const percentage = totalCriteria > 0 ? (passedCriteria / totalCriteria) * 100 : 0;
+		
+		// Round to 2 decimal places
+		return Math.round(percentage * 100) / 100;
 	}
 
 	/**

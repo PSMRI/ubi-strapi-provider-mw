@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
@@ -15,45 +9,46 @@ datasource db {
 }
 
 model Applications {
-  id               Int                @id @default(autoincrement())
-  benefitId        String
-  status           String
-  applicationData  String // form fields saved as encrypted text
-  customerId       String?
-  bapId            String?
-  calculatedAmount Json?
-  finalAmount      String?
-  orderId          String?
-  remark           String?
-  updatedBy        Int?
-  actionLog        Json?
-  calculationsProcessedAt      DateTime?
+  id                         Int                @id @default(autoincrement())
+  benefitId                  String
+  status                     String
+  applicationData            String
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+  bapId                      String?
+  customerId                 String?
+  finalAmount                String?
+  orderId                    String?
+  remark                     String?
+  actionLog                  Json?
+  updatedBy                  Int?
+  calculationsProcessedAt    DateTime?
+  calculatedAmount           Json?
   documentVerificationStatus String?
-  eligibilityStatus String? @default("pending")
-  eligibilityResult Json?
-  eligibilityCheckedAt DateTime?
-  applicationFiles ApplicationFiles[] @relation("ApplicationsToApplicationFiles")
-  createdAt        DateTime           @default(now()) // Automatically set on creation
-  updatedAt        DateTime           @updatedAt // Automatically updated on modification
+  eligibilityCheckedAt       DateTime?
+  eligibilityResult          Json?
+  eligibilityStatus          String?            @default("pending")
+  applicationFiles           ApplicationFiles[] @relation("ApplicationsToApplicationFiles")
 }
 
 model ApplicationFiles {
-  id                 Int          @id @default(autoincrement())
-  storage            String
-  filePath           String?
-  verificationStatus Json?
-  applicationId      Int
-  application        Applications @relation(fields: [applicationId], references: [id], name: "ApplicationsToApplicationFiles")
-  issuerName         String?      // Name of the issuer (nullable)
-  createdAt          DateTime     @default(now()) // Automatically set on creation
-  updatedAt          DateTime     @updatedAt // Automatically updated on modification
+  id                       Int          @id @default(autoincrement())
+  storage                  String
+  filePath                 String?
+  verificationStatus       Json?
+  applicationId            Int
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+  issuerName               String?
+  documentSubmissionReason Json?
+  documentSubtype          String?
+  documentType             String?
+  application              Applications @relation("ApplicationsToApplicationFiles", fields: [applicationId], references: [id])
 }
 
 model Users {
   id          Int       @id @default(autoincrement())
   s_id        String    @unique
-  roles       String[] // Array of strings to store multiple roles, can be empty
-  s_roles     String[] // Array of strings to store multiple roles, can be empty
   first_name  String
   middle_name String?
   last_name   String?
@@ -61,20 +56,22 @@ model Users {
   phone       String?
   enabled     Boolean   @default(true)
   blocked     Boolean   @default(false)
-  createdAt   DateTime  @default(now()) // Automatically set on creation
-  updatedAt   DateTime? @updatedAt // Automatically updated on modification
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  roles       String[]
+  s_roles     String[]
 }
 
 model Provider {
-  id                       Int       @id @default(autoincrement()) // Primary key auto-generated
-  catalogManagerId         String    @unique // Renamed from strapiId
-  catalogManagerDocumentId String    @unique // Renamed from strapidocumentId
-  name                     String    @unique // Unique field
-  catalogManagerCode       String    @unique // Renamed from strapiCode
-  catalogManagerRole       String[]  // Renamed from strapiRole
-  description              String    // Description field
-  createdAt                DateTime  @default(now()) // Automatically set on creation
-  updatedAt                DateTime  @updatedAt // Automatically updated on modification
-  publishedAt              DateTime? // Optional field for published timestamp
-  locale                   String?   // Optional locale field
+  id                       Int       @id @default(autoincrement())
+  catalogManagerId         String    @unique
+  catalogManagerDocumentId String    @unique
+  name                     String    @unique
+  catalogManagerCode       String    @unique
+  catalogManagerRole       String[]
+  description              String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  publishedAt              DateTime?
+  locale                   String?
 }

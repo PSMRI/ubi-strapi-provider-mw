@@ -1,5 +1,5 @@
-import { IsNotEmpty, IsObject } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsObject, IsOptional, IsString, IsArray } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateApplicationFilesDto {
   
@@ -10,10 +10,37 @@ export class CreateApplicationFilesDto {
   @IsNotEmpty()
   applicationId: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Additional application data in JSON format',
     example: { key: 'value' },
   })
+  @IsOptional()
   @IsObject()
-  verificationStatus? : Record<string, any>;
+  verificationStatus?: Record<string, any>;
+
+  // New VC document metadata fields
+  @ApiPropertyOptional({
+    description: 'Array of reasons for document submission',
+    example: ['disabilityType', 'disabilityRange'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  documentSubmissionReason?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Document subtype classification',
+    example: 'disabilityCertificate',
+  })
+  @IsOptional()
+  @IsString()
+  documentSubtype?: string;
+
+  @ApiPropertyOptional({
+    description: 'Primary document category',
+    example: 'disabilityProof',
+  })
+  @IsOptional()
+  @IsString()
+  documentType?: string;
 }
