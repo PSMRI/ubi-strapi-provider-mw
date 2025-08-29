@@ -1,27 +1,34 @@
-FROM node:20 as dependencies
+FROM node:20-alpine AS dependencies
+
+# Create app group and user with specific UID/GID
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
+
+# Create and set ownership of app directory
+RUN mkdir -p /app && chown -R appuser:appgroup /app
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm install
+# Install all dependencies as root first (including dev dependencies for Prisma)
+COPY --chown=appuser:appgroup package*.json ./
+RUN npm ci && npm cache clean --force
 
-# Copy everything else (including prisma/)
-COPY . .
+# Copy application files with proper ownership
+COPY --chown=appuser:appgroup prisma/ ./prisma/
+COPY --chown=appuser:appgroup src/ ./src/
+COPY --chown=appuser:appgroup nest-cli.json ./
+COPY --chown=appuser:appgroup tsconfig*.json ./
+COPY --chown=appuser:appgroup eslint.config.mjs ./
 
-# Optional check to confirm schema exists
-RUN ls -la prisma/schema.prisma
+# Optional check to confirm schema exists, generate Prisma client and build project as root
+RUN ls -la prisma/schema.prisma && \
+    npx prisma generate && \
+    npm run build
 
-# Generate Prisma client
-RUN npx prisma generate
+# Switch to non-root user for runtime
+USER appuser
 
-# Run migrations
-#RUN npx prisma migrate dev --name init
-#RUN npx prisma migrate reset --force
-
-# Build project
-RUN npm run build
-
+# Expose the correct port for your application
 EXPOSE 7000
 
-CMD ["npm", "start"]
+CMD ["npm", "run", "start:prod"]

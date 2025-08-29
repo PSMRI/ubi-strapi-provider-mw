@@ -1,0 +1,81 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CHANGELOG.md
+*.md
+docs/
+
+# Tests
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+coverage/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Build artifacts
+dist/
+build/
+.next/
+.nuxt/
+
+# Temporary files
+tmp/
+temp/
+
+# Miscellaneous
+.nyc_output
+.cache
+.parcel-cache
+
+# Scripts (excluding from production)
+scripts/
+
+# Mock files
+mock-files/
+
+# Upload files (sensitive data)
+uploads/
