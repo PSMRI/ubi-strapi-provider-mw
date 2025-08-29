@@ -9,21 +9,29 @@ RUN mkdir -p /app && chown -R appuser:appgroup /app
 
 WORKDIR /app
 
-# Install all dependencies as root first (including dev dependencies for Prisma)
-COPY --chown=appuser:appgroup package*.json ./
-RUN npm ci && npm cache clean --force
+# Copy package files as root without giving write permissions to appuser
+COPY package*.json ./
+RUN chown root:appgroup package*.json && chmod 644 package*.json && \
+    npm ci && npm cache clean --force
 
-# Copy application files with proper ownership
-COPY --chown=appuser:appgroup prisma/ ./prisma/
-COPY --chown=appuser:appgroup src/ ./src/
-COPY --chown=appuser:appgroup nest-cli.json ./
-COPY --chown=appuser:appgroup tsconfig*.json ./
-COPY --chown=appuser:appgroup eslint.config.mjs ./
+# Copy application files as root with read-only permissions
+COPY prisma/ ./prisma/
+COPY src/ ./src/
+COPY nest-cli.json ./
+COPY tsconfig*.json ./
+COPY eslint.config.mjs ./
 
-# Optional check to confirm schema exists, generate Prisma client and build project as root
+# Generate Prisma client and build project first (while files are still writable)
 RUN ls -la prisma/schema.prisma && \
     npx prisma generate && \
-    npm run build
+    npm run build && \
+    chown -R root:appgroup . && \
+    find . -type f -exec chmod 644 {} \; && \
+    find . -type d -exec chmod 755 {} \; && \
+    chmod -R o-rwx . && \
+    mkdir -p /app/logs /app/temp && \
+    chown appuser:appgroup /app/logs /app/temp && \
+    chmod 755 /app/logs /app/temp
 
 # Switch to non-root user for runtime
 USER appuser
