@@ -11,6 +11,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 *.env
+.npmrc
+.yarnrc
+.pnpmrc
 
 # Git
 .git
@@ -70,6 +73,18 @@ temp/
 .nyc_output
 .cache
 .parcel-cache
+.tsbuildinfo
+*.tsbuildinfo
+
+# Keys/credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa*
+id_ed25519*
+.ssh/
 
 # Scripts (excluding from production)
 scripts/

@@ -1,11 +1,9 @@
 FROM node:20-alpine AS dependencies
 
-# Create app group and user with specific UID/GID
+# Create app group and user with specific UID/GID, and set up app directory
 RUN addgroup -g 1001 -S appgroup && \
-    adduser -S appuser -u 1001 -G appgroup
-
-# Create and set ownership of app directory
-RUN mkdir -p /app && chown -R appuser:appgroup /app
+    adduser -S appuser -u 1001 -G appgroup -s /sbin/nologin -h /home/appuser && \
+    mkdir -p /app && chown -R appuser:appgroup /app
 
 WORKDIR /app
 
@@ -26,9 +24,9 @@ RUN ls -la prisma/schema.prisma && \
     npx prisma generate && \
     npm run build && \
     chown -R root:appgroup . && \
-    find . -type f -exec chmod 644 {} \; && \
-    find . -type d -exec chmod 755 {} \; && \
     chmod -R o-rwx . && \
+    find . -type f -exec chmod g-w {} \; && \
+    find . -type d -exec chmod g-w {} \; && \
     mkdir -p /app/logs /app/temp && \
     chown appuser:appgroup /app/logs /app/temp && \
     chmod 755 /app/logs /app/temp
