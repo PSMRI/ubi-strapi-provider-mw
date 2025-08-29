@@ -2,7 +2,7 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache g++ libc6-compat make python3
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY prisma/ ./prisma/
 COPY src/ ./src/
 COPY nest-cli.json ./
