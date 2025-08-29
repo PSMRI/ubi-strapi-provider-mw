@@ -2,7 +2,7 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache g++ libc6-compat make python3
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY prisma/ ./prisma/
 COPY src/ ./src/
 COPY nest-cli.json ./
@@ -16,13 +16,14 @@ ENV NODE_ENV=production
 RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup -s /sbin/nologin -h /home/appuser
 WORKDIR /app
 COPY --chown=root:appgroup package*.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN chmod 644 package*.json && npm ci --omit=dev --ignore-scripts && npm cache clean --force
 # Copy only runtime artifacts
 COPY --chown=root:appgroup prisma/ ./prisma/
 COPY --from=builder --chown=root:appgroup /app/dist/ ./dist/
 COPY --from=builder --chown=root:appgroup /app/node_modules/.prisma/ ./node_modules/.prisma/
-# runtime dirs
-RUN mkdir -p /app/logs /app/temp && chown appuser:appgroup /app/logs /app/temp && chmod 755 /app/logs /app/temp
+RUN chmod -R 644 prisma/ dist/ node_modules/.prisma/ && \
+    find prisma/ dist/ node_modules/.prisma/ -type d -exec chmod 755 {} \; && \
+    mkdir -p /app/logs /app/temp && chown appuser:appgroup /app/logs /app/temp && chmod 755 /app/logs /app/temp
 USER appuser
 EXPOSE 7000
 CMD ["node", "dist/main.js"]
