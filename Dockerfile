@@ -12,7 +12,7 @@ WORKDIR /app
 # Copy package files as root without giving write permissions to appuser
 COPY package*.json ./
 RUN chown root:appgroup package*.json && chmod 644 package*.json && \
-    npm ci && npm cache clean --force
+    npm ci --ignore-scripts && npm cache clean --force
 
 # Copy application files as root with read-only permissions
 COPY prisma/ ./prisma/
