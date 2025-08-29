@@ -68,6 +68,9 @@ export default tseslint.config(
 			'no-trailing-spaces': 'error',
 			indent: ['error', 'tab', { SwitchCase: 1 }],
 
+			// Trailing Comma Rules - Allow trailing commas to match Prettier
+			'comma-dangle': ['error', 'always-multiline'],
+
 			// Prettier and Indentation Rules
 			'prettier/prettier': [
 				'error',
@@ -77,7 +80,7 @@ export default tseslint.config(
 					semi: true,
 					singleQuote: true,
 					tabWidth: 4,
-					trailingComma: 'es5',
+					trailingComma: 'all',
 					useTabs: true,
 				},
 			],

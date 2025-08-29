@@ -9,7 +9,9 @@ if (process.env.NODE_ENV === 'test' || !process.env.SENTRY_DSN) {
 	if (process.env.NODE_ENV === 'test') {
 		console.log('Sentry initialization skipped in test environment');
 	} else {
-		console.warn('⚠️ SENTRY_DSN not found - Sentry will not capture events');
+		console.warn(
+			'⚠️ SENTRY_DSN not found - Sentry will not capture events',
+		);
 	}
 } else {
 	// Ensure to call this before requiring any other modules!

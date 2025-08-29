@@ -48,7 +48,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
 			500: 'Internal Server Error',
 		};
 
-		return errorMap[status] || errorMessage || 'An unexpected error occurred';
+		return (
+			errorMap[status] || errorMessage || 'An unexpected error occurred'
+		);
 	}
 
 	private logError(
@@ -127,7 +129,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
 					const response = exception.getResponse();
 					scope.setContext('http_exception', {
 						response:
-							typeof response === 'object' ? response : { message: response },
+							typeof response === 'object'
+								? response
+								: { message: response },
 						status: exception.getStatus(),
 					});
 				} else if (exception instanceof AxiosError) {
@@ -142,16 +146,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
 							baseURL: exception.config?.baseURL,
 						},
 					});
-				} else if (exception instanceof Prisma.PrismaClientValidationError) {
-					scope.setTag('exception_type', 'PrismaClientValidationError');
+				} else if (
+					exception instanceof Prisma.PrismaClientValidationError
+				) {
+					scope.setTag(
+						'exception_type',
+						'PrismaClientValidationError',
+					);
 				} else if (
 					exception instanceof Prisma.PrismaClientUnknownRequestError
 				) {
-					scope.setTag('exception_type', 'PrismaClientUnknownRequestError');
+					scope.setTag(
+						'exception_type',
+						'PrismaClientUnknownRequestError',
+					);
 				} else if (
 					exception instanceof Prisma.PrismaClientInitializationError
 				) {
-					scope.setTag('exception_type', 'PrismaClientInitializationError');
+					scope.setTag(
+						'exception_type',
+						'PrismaClientInitializationError',
+					);
 				} else {
 					scope.setTag('exception_type', 'UnknownError');
 				}
@@ -200,7 +215,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
 		}
 		// Handle PrismaClientInitializationError
 		else if (exception instanceof Prisma.PrismaClientInitializationError) {
-			errorMessage = exception.message ?? 'PRISMA_CLIENT_INITIALIZATION_ERROR';
+			errorMessage =
+				exception.message ?? 'PRISMA_CLIENT_INITIALIZATION_ERROR';
 		}
 		// Handle other exceptions
 		else {
