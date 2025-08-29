@@ -22,7 +22,7 @@ COPY --chown=root:appgroup --chmod=755 prisma/ ./prisma/
 COPY --from=builder --chown=root:appgroup --chmod=755 /app/dist/ ./dist/
 COPY --from=builder --chown=root:appgroup --chmod=755 /app/node_modules/.prisma/ ./node_modules/.prisma/
 COPY --from=builder --chown=root:appgroup --chmod=755 /app/node_modules/@prisma/client/ ./node_modules/@prisma/client/
-RUN find prisma/ dist/ node_modules/.prisma/ node_modules/@prisma/client/ -type f -exec chmod 644 {} \; && \
+RUN find prisma/ dist/ -type f ! -perm /111 -exec chmod 644 {} \; && \
     mkdir -p /app/logs /app/temp && chown appuser:appgroup /app/logs /app/temp && chmod 755 /app/logs /app/temp
 USER appuser
 EXPOSE 7000
