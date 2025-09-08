@@ -13,7 +13,7 @@ cd "$BASE_DIR" || exit 1
 
 # ----- Remove old code (except persistent data) -----
 echo "Cleaning up existing code..."
-rm -rf "$REPO_NAME/src" "$REPO_NAME/config" "$REPO_NAME/package.json" || true
+rm -rf "$REPO_NAME"
 
 # ----- Clone latest code -----
 echo "Cloning repository $REPO_URL (branch: $BRANCH)..."
