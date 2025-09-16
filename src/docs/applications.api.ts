@@ -11,11 +11,11 @@ export const ApplicationsApiDocs = {
           benefitId: "BENEFIT123",
           firstName: "John",
           lastName: "Doe",
-          age: "25",
+          age: 25,
           gender: "male",
           vc_documents: [
             {
-              document_submission_reason: "[\"gender\"]",
+              document_submission_reason: ["gender"],
               document_type: "idProof",
               document_subtype: "otrCertificate",
               document_format: "json",
