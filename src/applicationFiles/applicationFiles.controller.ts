@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Patch, UseFilters, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { ApplicationFilesService } from './applicationFiles.service';
 import { CreateApplicationFilesDto } from './dto/create-applicationfiles.dto';
@@ -9,6 +9,7 @@ import { AuthGuard } from 'src/auth/auth.guard';
 import { ApplicationFilesApiDocs } from '../docs';
 
 @UseFilters(new AllExceptionsFilter())
+@ApiBearerAuth('access-token')
 @ApiTags('ApplicationFiles')
 @Controller('application-files')
 export class ApplicationFilesController {

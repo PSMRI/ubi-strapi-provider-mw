@@ -19,19 +19,24 @@ async function bootstrap() {
 		}),
 	);
 
+	// Ensure Swagger UI is correctly configured to include Authorization header
 	const config = new DocumentBuilder()
 		.setTitle('API Documentation')
 		.setDescription('The API description')
 		.setVersion('1.0')
+		.addTag('App', 'Application health check endpoints')
 		.addTag('Auth', 'Authentication endpoints')
 		.addTag('Benefits', 'Benefits management endpoints')
 		.addTag('Applications', 'Application management endpoints')
 		.addTag('ApplicationFiles', 'File management endpoints')
-		.addApiKey(
-			{ type: 'apiKey', name: 'Authorization', in: 'header' },
+		.addTag('Strapi Admin', 'Strapi administration endpoints')
+		.addTag('Verification', 'Verification management endpoints')
+		.addBearerAuth(
+			{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
 			'access-token',
 		)
 		.build();
+
 	const document = SwaggerModule.createDocument(app, config);
 	SwaggerModule.setup('documentation', app, document, {
 		customSiteTitle: 'API Documentation UBI Provider',
@@ -42,6 +47,8 @@ async function bootstrap() {
 					'Benefits',
 					'Applications',
 					'ApplicationFiles',
+					'Verification',
+					'Strapi Admin',
 				];
 				return order.indexOf(a) - order.indexOf(b);
 			},
