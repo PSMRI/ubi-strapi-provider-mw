@@ -1,16 +1,28 @@
 name: Deploy to UBA-DEV
+
 on:
   workflow_dispatch:
+    inputs:
+      TAG:
+        description: 'Docker image tag to deploy'
+        required: true
+        default: 'latest'
+      BRANCH:
+        description: 'Git branch to deploy'
+        required: true
+        default: 'main'
   push:
-    branches:
-      - main
+    tags:
+      - '*'  # Trigger on any tag push
+
 jobs:
   Deploy_on_UBA_DEV:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: UBA-DEV
+
     steps:
-      - name: Deploy Stack via SSH
+      - name: Deploy Strapi MW via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST_NAME }}
@@ -18,15 +30,23 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.PORT }}
           script: |
-            cd ${{ secrets.TARGET_DIR }}
-            if [ -f .env ]; then
-              rm .env
-            fi
-            echo '${{ secrets.DEV_ENV }}' > .env
-            ls -ltra
-            ./deploy.sh
+            # ----- Set environment variables -----
+            export BASE_DIR="${{ secrets.TARGET_DIR }}"
+            export REPO_NAME="ubi-strapi-provider-mw"
+            export REPO_URL="https://github.com/PSMRI/ubi-strapi-provider-mw.git"
+            export BRANCH="${{ github.event.inputs.BRANCH || 'main' }}"
+            export TAG="${{ github.event.inputs.TAG || github.ref_name || 'latest' }}"
+            export CONTAINER_NAME="ubi-strapi-provider-mw-onest"
 
-      ## Notify on Slack
+            cd "$BASE_DIR" || exit 1
+
+            # ----- Prepare .env -----
+            if [ -f .env ]; then rm .env; fi
+            echo '${{ secrets.DEV_ENV }}' > .env
+
+            # ----- Run deploy script -----
+            bash deploy.sh
+
       - name: Notify on Slack channel
         uses: iRoachie/slack-github-actions@v2.3.2
         env:
