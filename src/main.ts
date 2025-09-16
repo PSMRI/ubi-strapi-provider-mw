@@ -28,7 +28,6 @@ async function bootstrap() {
 		.addTag('Auth', 'Authentication endpoints')
 		.addTag('Benefits', 'Benefits management endpoints')
 		.addTag('Applications', 'Application management endpoints')
-		.addTag('ApplicationFiles', 'File management endpoints')
 		.addTag('Strapi Admin', 'Strapi administration endpoints')
 		.addTag('Verification', 'Verification management endpoints')
 		.addBearerAuth(
@@ -46,7 +45,6 @@ async function bootstrap() {
 					'Auth',
 					'Benefits',
 					'Applications',
-					'ApplicationFiles',
 					'Verification',
 					'Strapi Admin',
 				];
