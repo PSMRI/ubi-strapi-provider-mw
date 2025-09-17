@@ -702,11 +702,11 @@ export class BenefitsService {
       message: {
         catalog: {
           descriptor: {
-            name: 'Protean DSEP Scholarships and Grants BPP Platform',
+            name: this.bppId,
           },
           providers: [
             {
-              id: 'PROVIDER_UNIFIED',
+              id: this.bppId,
               descriptor: {
                 name:
                   firstScholarship?.providingEntity?.name ?? 'Unknown Provider',
