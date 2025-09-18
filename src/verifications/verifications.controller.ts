@@ -1,9 +1,12 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOperation } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { VerificationService } from './verification.service';
 import { VerifyApplicationVcsRequestDto } from './dtos/verify-application-vcs-request.dto';
 import { VerifyApplicationVcsResponseDto } from './dtos/verify-application-vcs-response.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
+
+@ApiTags('Verification')
+@ApiBearerAuth('access-token')
 @Controller('verification')
 export class VerificationController {
   constructor(private readonly verificationService: VerificationService) {}

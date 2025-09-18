@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SearchRequestDto } from './dto/search-request.dto';
 import { BenefitsService } from './benefits.service';
 import { AllExceptionsFilter } from 'src/common/filters/exception.filters';
@@ -35,6 +35,7 @@ export class BenefitsController {
   })
   @Get('getById/:docid')
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
   getBenefitsById(@Param('docid') id: string, @Req() req: Request): any {
     return this.benefitsService.getBenefitsById(id, req);
@@ -42,6 +43,7 @@ export class BenefitsController {
 
   @Post('search')
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get Benefits for given provider user',
