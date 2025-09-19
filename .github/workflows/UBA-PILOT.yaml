@@ -16,7 +16,7 @@ on:
       - '*'  # Trigger on any tag push
 
 jobs:
-  Deploy_on_UBA_DEV:
+  Deploy_on_UBA_PILOT:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: UBA-DEPWD-PILOT
