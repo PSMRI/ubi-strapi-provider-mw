@@ -42,7 +42,7 @@ jobs:
 
             # ----- Prepare .env -----
             if [ -f .env ]; then rm .env; fi
-            echo '${{ secrets.DEV_ENV_PILOT }}' > .env
+            echo '${{ secrets.ENV_PILOT }}' > .env
 
             # ----- Run deploy script -----
             bash deploy.sh
