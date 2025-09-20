@@ -380,7 +380,6 @@ export class ApplicationsService {
 	// Get a single application by ID
 	async findOne(id: number, req: Request) {
 		const authToken = getAuthToken(req);
-
 		// Get user from request middleware
 		const userId = (req as any).mw_userid;
 
@@ -962,7 +961,8 @@ export class ApplicationsService {
 		strictCheck: boolean,
 	) {
 		try {
-			const eligibilityRules = benefitDefinition?.data?.eligibility ?? [];
+			const eligibilityRules = benefitDefinition?.data?.data?.eligibility ?? [];	
+
 			if (Array.isArray(eligibilityRules)) {
 				eligibilityRules.forEach((rule) => {
 					if (rule && typeof rule === 'object' && 'type' in rule) {
