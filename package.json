@@ -32,7 +32,7 @@
     "@nestjs/platform-express": "^11.1.6",
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.2.0",
-    "@prisma/client": "^6.13.0",
+    "@prisma/client": "^6.16.2",
     "@sentry/nestjs": "^10.5.0",
     "@types/ua-parser-js": "^0.7.39",
     "axios": "^1.9.0",
