@@ -14,7 +14,7 @@ export class CsvExportEligibilityDto {
   @ApiProperty({
     description: 'Type of report (as per reports.json)',
     required: true,
-    example: 'format1'
+    example: 'benefit_amounts'
   })
   @IsString()
   @IsNotEmpty()
