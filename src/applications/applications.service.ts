@@ -894,7 +894,7 @@ export class ApplicationsService {
 		
 		const strictCheck = req?.query?.strictCheck === 'true';
 		const formatEligiblityPayload = await this.formatEligibility(
-			benefitDefinition,
+			benefitDefinition?.data,
 			application,
 			strictCheck,
 		);
@@ -962,6 +962,9 @@ export class ApplicationsService {
 		strictCheck: boolean,
 	) {
 		try {
+			if (!benefitDefinition?.data) {
+				throw new BadRequestException('Benefit definition data is missing');
+			}
 			const eligibilityRules = benefitDefinition?.data?.eligibility ?? [];
 			if (Array.isArray(eligibilityRules)) {
 				eligibilityRules.forEach((rule) => {
