@@ -906,4 +906,84 @@ export class BenefitsService {
 			})),
 		};
 	}
+
+	async init2(initRequestDto: any): Promise<any> {		
+		// Validate BAP ID and URI
+		this.checkBapIdAndUri(
+			initRequestDto?.context?.bap_id,
+			initRequestDto?.context?.bap_uri,
+		);
+
+		try {
+		// Extract applicationData from the payload
+		const applicationData = initRequestDto?.message?.order?.tags?.applicationData;
+		
+		if (applicationData) {
+			console.log('Extracted applicationData:', JSON.stringify(applicationData, null, 2));
+		} else {
+			console.log('No applicationData found in payload');
+			throw new BadRequestException('ApplicationData is required in payload');
+		}
+
+		const benefitId = initRequestDto.message.order.items[0].id;
+
+		// Add bapId to applicationData for application creation
+		const applicationDataWithContext = {
+			...applicationData,
+			bapId: initRequestDto.context.bap_id,
+		};
+
+		console.log('Creating application with payload:', JSON.stringify(applicationDataWithContext, null, 2));
+		
+		// Create the application and get the real applicationId
+		const createdApplication = await this.applicationsService.create(applicationDataWithContext);
+		const applicationId = createdApplication.application.id;
+
+		console.log('Created application with ID:', applicationId);
+
+		// Fetch benefit data from the Strapi API
+		const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+
+		let mappedResponse;
+
+		if (benefitData?.data) {
+			mappedResponse = await this.transformScholarshipsToOnestFormat(
+				initRequestDto,
+				[benefitData?.data?.data],
+				'on_init',
+			);
+		}
+
+		const { id, descriptor, categories, locations, items, rateable }: any =
+			mappedResponse?.message.catalog.providers?.[0] ?? {};
+
+		// Add real applicationId to the first item
+		items[0].applicationId = applicationId;
+
+			initRequestDto.message.order = {
+				...initRequestDto.message.order,
+				// Ensure the object matches the InitOrderDto type
+				providers: [{ id, descriptor, rateable, locations, categories }],
+				items,
+			};
+
+			initRequestDto.context = {
+				...initRequestDto.context,
+				...mappedResponse?.context,
+			};
+
+			return initRequestDto;
+		} catch (error) {
+			if (error.isAxiosError) {
+				// Handle AxiosError and rethrow as HttpException
+				throw new HttpException(
+					error.response?.data?.message ?? 'Benefit not found',
+					error.response?.status ?? HttpStatus.NOT_FOUND,
+				);
+			}
+
+			console.error('Error in init2:', error);
+			throw new InternalServerErrorException('Failed to initialize benefit');
+		}
+	}
 }

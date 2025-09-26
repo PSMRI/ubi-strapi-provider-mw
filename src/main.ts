@@ -19,6 +19,12 @@ async function bootstrap() {
 		}),
 	);
 
+	// Enable CORS for frontend at localhost:5173
+	app.enableCors({
+		origin: 'http://localhost:5173',
+		credentials: true,
+	});
+
 	// Ensure Swagger UI is correctly configured to include Authorization header
 	const config = new DocumentBuilder()
 		.setTitle('API Documentation')
