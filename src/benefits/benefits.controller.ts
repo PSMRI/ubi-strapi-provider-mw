@@ -105,13 +105,5 @@ export class BenefitsController {
     return this.benefitsService.status(statusRequestDto);
   }
 
-  @Post('dsep/init2')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Initialize 2',
-    description: 'Alternative initialization endpoint for testing and development purposes.',
-  })
-  async init2(@Body() initRequestDto: InitRequestDto) {
-    return this.benefitsService.init2(initRequestDto);
-  }
+
 }
