@@ -13,7 +13,7 @@ import { HttpService } from '@nestjs/axios';
 import { SearchRequestDto } from './dto/search-request.dto';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-import { generateRandomString, getAuthToken, titleCase } from 'src/common/util';
+import { generateRandomString, getAuthToken, titleCase, unsetObjectKeys } from 'src/common/util';
 import { PrismaService } from '../prisma.service';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { InitRequestDto } from './dto/init-request.dto';
@@ -774,7 +774,7 @@ export class BenefitsService {
 				code: 'eligibility',
 				name: 'Eligibility',
 			},
-			list: eligibility.map((e) => ({
+			list: await Promise.all(eligibility.map(async (e) =>({
 				descriptor: {
 					code: e.evidence,
 					name:
@@ -784,9 +784,9 @@ export class BenefitsService {
 						e.evidence,
 					short_desc: e.description,
 				},
-				value: JSON.stringify(e),
+				value:  unsetObjectKeys(e, ['id']),
 				display: true,
-			})),
+			}))),
 		};
 	}
 
@@ -799,14 +799,14 @@ export class BenefitsService {
 				code: 'required-docs',
 				name: 'Required Documents',
 			},
-			list: documents.map((doc) => ({
+			list: await Promise.all(documents.map(async (doc) => ({
 				descriptor: {
 					code: doc.isRequired ? 'mandatory-doc' : 'optional-doc',
 					name: doc.isRequired ? 'Mandatory Document' : 'Optional Document',
 				},
-				value: JSON.stringify(doc),
+				value: unsetObjectKeys(doc, ['id']),
 				display: true,
-			})),
+			}))),
 		};
 	}
 
@@ -819,14 +819,14 @@ export class BenefitsService {
 				code: 'benefits',
 				name: 'Benefits',
 			},
-			list: benefits.map((b) => ({
+			list: await Promise.all(benefits.map(async (b) => ({
 				descriptor: {
 					code: 'financial',
 					name: b.title,
 				},
-				value: JSON.stringify(b),
+				value: unsetObjectKeys(b, ['id','__component']),	
 				display: true,
-			})),
+			}))),
 		};
 	}
 
@@ -839,14 +839,14 @@ export class BenefitsService {
 				code: 'exclusions',
 				name: 'Exclusions',
 			},
-			list: exclusions.map((e) => ({
+			list: await Promise.all(exclusions.map(async (e) => ({
 				descriptor: {
 					code: 'ineligibility',
 					name: 'Ineligibility Condition',
 				},
-				value: JSON.stringify(e),
+				value: unsetObjectKeys(e, ['id']),
 				display: true,
-			})),
+			}))),
 		};
 	}
 
@@ -859,14 +859,14 @@ export class BenefitsService {
 				code: 'sponsoringEntities',
 				name: 'Sponsoring Entities',
 			},
-			list: sponsoringEntities.map((sponsoringEntity) => ({
+			list: await Promise.all(sponsoringEntities.map(async (sponsoringEntity) => ({
 				descriptor: {
 					code: 'sponsoringEntities',
 					name: 'Entities Sponsoring Benefits',
 				},
-				value: JSON.stringify(sponsoringEntity),
+				value: unsetObjectKeys(sponsoringEntity, ['id']),
 				display: true,
-			})),
+			}))),
 		};
 	}
 
@@ -896,14 +896,14 @@ export class BenefitsService {
 				code: 'applicationForm',
 				name: 'Application Form',
 			},
-			list: allFields.map((field) => ({
+			list: await Promise.all(allFields.map(async (field) => ({
 				descriptor: {
 					code: 'applicationFormField-' + field.name,
 					name: 'Application Form Field - ' + field.label,
 				},
-				value: JSON.stringify(field),
+				value: unsetObjectKeys(field, ['id']),
 				display: true,
-			})),
+			}))),
 		};
 	}
 }
