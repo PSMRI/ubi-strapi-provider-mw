@@ -61,3 +61,25 @@ export function convertPropertiesToFields(properties : SectionProperty[]): { fie
   extractFields(properties);
   return result;
 }
+
+export function unsetObjectKeys(objectTag:object, keysToRemove:any) {
+  if (!objectTag) return null;
+
+  function removeKeys(objectTag) {
+    if (Array.isArray(objectTag)) {
+    return objectTag.map(removeKeys);
+    } else if (objectTag !== null && typeof objectTag === "object") {
+    return Object.fromEntries(
+      Object.entries(objectTag)
+      .filter(([key]) => !keysToRemove.includes(key))
+      .map(([key, value]) => [key, removeKeys(value)])
+    );
+    }
+    
+    return objectTag;
+  }
+  
+  const cleanedObj = removeKeys(objectTag);
+
+  return JSON.stringify(cleanedObj); // pretty format
+  }
