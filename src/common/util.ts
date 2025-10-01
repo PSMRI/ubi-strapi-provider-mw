@@ -63,7 +63,7 @@ export function convertPropertiesToFields(properties : SectionProperty[]): { fie
 }
 
 export function unsetObjectKeys<T extends object>(objectTag: T, keysToRemove: string[]): T | null {
-  if (!objectTag) return null;
+  if (objectTag == null) return null;
 
   function removeKeys(objectTag) {
     if (Array.isArray(objectTag)) {
