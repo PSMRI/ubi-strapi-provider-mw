@@ -233,7 +233,7 @@ export class BenefitsService {
 		throw new BadRequestException('Invalid domain provided');
 	}
 
-	async selectBenefitsById(body: SelectRequestDto): Promise<SelectResponseDto> {
+	async selectBenefitsById(body: SelectRequestDto): Promise<{ responses: SelectResponseDto[] }> {
 		this.checkBapIdAndUri(body?.context?.bap_id, body?.context?.bap_uri);
 		try {
 			let id = body.message.order.items[0].id;
@@ -248,7 +248,10 @@ export class BenefitsService {
         );
       }
 
-			return mappedResponse;
+			// Wrap the response in responses array for UI compatibility
+			return {
+				responses: [mappedResponse]
+			};
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
@@ -263,7 +266,7 @@ export class BenefitsService {
 		}
 	}
 
-		async init(initRequestDto: any): Promise<any> {
+		async init(initRequestDto: InitRequestDto): Promise<any> {
 			// Validate BAP ID and URI
 			this.checkBapIdAndUri(
 				initRequestDto?.context?.bap_id,
@@ -271,8 +274,8 @@ export class BenefitsService {
 			);
 
 			try {
-				// Extract applicationData from the payload
-				const applicationData = initRequestDto?.message?.order?.fulfillments[0]?.customer?.applicationData;
+			// Extract applicationData from the payload
+			const applicationData = initRequestDto?.message?.order?.fulfillments[0]?.customer?.applicationData;
 
 				if (applicationData) {
 					console.log('Extracted applicationData:', JSON.stringify(applicationData, null, 2));
@@ -281,24 +284,23 @@ export class BenefitsService {
 					throw new BadRequestException('ApplicationData is required in payload');
 				}
 
-				const benefitId = initRequestDto.message.order.items[0].id;
+			const benefitId = initRequestDto.message.order.items[0].id;
 
-				// Add bapId to applicationData for application creation
-				const applicationDataWithContext = {
-					...applicationData,
-					bapId: initRequestDto.context.bap_id,
-				};
+			// Validate benefit exists before creating application
+			const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+			if (!benefitData?.data) {
+				throw new BadRequestException(`Benefit ${benefitId} not found`);
+			}
 
-				console.log('Creating application with payload:', JSON.stringify(applicationDataWithContext, null, 2));
+			// Add bapId to applicationData for application creation
+			const applicationDataWithContext = {
+				...applicationData,
+				bapId: initRequestDto.context.bap_id,
+			};
 
-				// Create the application and get the real applicationId
-				const createdApplication = await this.applicationsService.create(applicationDataWithContext);
-				const applicationId = createdApplication.application.id;
-
-				console.log('Created application with ID:', applicationId);
-
-				// Fetch benefit data from the Strapi API
-				const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+			// Create the application and get the real applicationId
+			const createdApplication = await this.applicationsService.create(applicationDataWithContext);
+			const applicationId = createdApplication.application.id;
 
 				let mappedResponse;
 
@@ -310,11 +312,18 @@ export class BenefitsService {
 					);
 				}
 
-				const { id, descriptor, categories, locations, items, rateable }: any =
-					mappedResponse?.message.catalog.providers?.[0] ?? {};
+			const { id, descriptor, categories, locations, items, rateable }: any =
+				mappedResponse?.message.catalog.providers?.[0] ?? {};
 
-				// Add real applicationId to the first item
-				items[0].applicationId = applicationId;
+			if (!items || !id) {
+				throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
+			}
+
+			// Add real applicationId to the first item
+			if (!items?.[0]) {
+				throw new InternalServerErrorException('No items found in transformed benefit data');
+			}
+			items[0].applicationId = applicationId;
 
 				initRequestDto.message.order = {
 					...initRequestDto.message.order,
