@@ -62,7 +62,7 @@ export function convertPropertiesToFields(properties : SectionProperty[]): { fie
   return result;
 }
 
-export function unsetObjectKeys(objectTag:object, keysToRemove:any) {
+export function unsetObjectKeys<T extends object>(objectTag: T, keysToRemove: string[]): string | null {
   if (!objectTag) return null;
 
   function removeKeys(objectTag) {
