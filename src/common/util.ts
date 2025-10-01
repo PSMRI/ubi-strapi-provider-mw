@@ -62,7 +62,7 @@ export function convertPropertiesToFields(properties : SectionProperty[]): { fie
   return result;
 }
 
-export function unsetObjectKeys<T extends object>(objectTag: T, keysToRemove: string[]): string | null {
+export function unsetObjectKeys<T extends object>(objectTag: T, keysToRemove: string[]): T | null {
   if (!objectTag) return null;
 
   function removeKeys(objectTag) {
@@ -81,5 +81,5 @@ export function unsetObjectKeys<T extends object>(objectTag: T, keysToRemove: st
   
   const cleanedObj = removeKeys(objectTag);
 
-  return JSON.stringify(cleanedObj); // pretty format
+  return cleanedObj; // pretty format
   }
