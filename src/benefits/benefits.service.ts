@@ -285,7 +285,11 @@ export class BenefitsService {
 					throw new BadRequestException('ApplicationData is required in payload');
 				}
 
-			const benefitId = initRequestDto.message.order.items[0].id;
+			const item = initRequestDto?.message?.order?.items?.[0];
+			if (!item?.id) {
+				throw new BadRequestException('message.order.items[0].id is required');
+			}
+			const benefitId = item.id;
 
 			// Validate benefit exists before creating application
 			const benefitData = await this.getBenefitsByIdStrapi(benefitId);
