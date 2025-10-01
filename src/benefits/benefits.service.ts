@@ -276,7 +276,7 @@ export class BenefitsService {
 
 			try {
 			// Extract applicationData from the payload
-			const applicationData = initRequestDto?.message?.order?.fulfillments[0]?.customer?.applicationData;
+			const applicationData = initRequestDto?.message?.order?.fulfillments?.[0]?.customer?.applicationData;
 
 				if (applicationData) {
 					// Application data extracted successfully

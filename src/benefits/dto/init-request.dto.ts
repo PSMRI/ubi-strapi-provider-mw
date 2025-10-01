@@ -86,6 +86,7 @@ class InitOrderDto {
 
   @ApiPropertyOptional({ description: 'List of providers' })
   @IsOptional()
+  @IsArray()
   providers?: any[];
 
   @ApiProperty({ description: 'List of fulfillments' })
