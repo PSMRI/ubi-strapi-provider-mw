@@ -774,7 +774,7 @@ export class BenefitsService {
 				code: 'eligibility',
 				name: 'Eligibility',
 			},
-			list: await Promise.all(eligibility.map(async (e) =>({
+			list:eligibility.map( (e) =>({
 				descriptor: {
 					code: e.evidence,
 					name:
@@ -786,7 +786,7 @@ export class BenefitsService {
 				},
 				value:  unsetObjectKeys(e, ['id']),
 				display: true,
-			}))),
+			})),
 		};
 	}
 
@@ -799,14 +799,14 @@ export class BenefitsService {
 				code: 'required-docs',
 				name: 'Required Documents',
 			},
-			list: await Promise.all(documents.map(async (doc) => ({
+			list: documents.map( (doc) => ({
 				descriptor: {
 					code: doc.isRequired ? 'mandatory-doc' : 'optional-doc',
 					name: doc.isRequired ? 'Mandatory Document' : 'Optional Document',
 				},
 				value: unsetObjectKeys(doc, ['id']),
 				display: true,
-			}))),
+			})),
 		};
 	}
 
@@ -819,14 +819,14 @@ export class BenefitsService {
 				code: 'benefits',
 				name: 'Benefits',
 			},
-			list: await Promise.all(benefits.map(async (b) => ({
+			list: benefits.map( (b) => ({
 				descriptor: {
 					code: 'financial',
 					name: b.title,
 				},
 				value: unsetObjectKeys(b, ['id','__component']),	
 				display: true,
-			}))),
+			})),
 		};
 	}
 
@@ -839,14 +839,14 @@ export class BenefitsService {
 				code: 'exclusions',
 				name: 'Exclusions',
 			},
-			list: await Promise.all(exclusions.map(async (e) => ({
+			list: exclusions.map( (e) => ({
 				descriptor: {
 					code: 'ineligibility',
 					name: 'Ineligibility Condition',
 				},
 				value: unsetObjectKeys(e, ['id']),
 				display: true,
-			}))),
+			})),
 		};
 	}
 
@@ -859,14 +859,14 @@ export class BenefitsService {
 				code: 'sponsoringEntities',
 				name: 'Sponsoring Entities',
 			},
-			list: await Promise.all(sponsoringEntities.map(async (sponsoringEntity) => ({
+			list: sponsoringEntities.map( (sponsoringEntity) => ({
 				descriptor: {
 					code: 'sponsoringEntities',
 					name: 'Entities Sponsoring Benefits',
 				},
 				value: unsetObjectKeys(sponsoringEntity, ['id']),
 				display: true,
-			}))),
+			})),
 		};
 	}
 
@@ -896,14 +896,14 @@ export class BenefitsService {
 				code: 'applicationForm',
 				name: 'Application Form',
 			},
-			list: await Promise.all(allFields.map(async (field) => ({
+			list: allFields.map( (field) => ({
 				descriptor: {
 					code: 'applicationFormField-' + field.name,
 					name: 'Application Form Field - ' + field.label,
 				},
 				value: unsetObjectKeys(field, ['id']),
 				display: true,
-			}))),
+			})),
 		};
 	}
 }
