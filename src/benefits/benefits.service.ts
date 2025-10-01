@@ -17,6 +17,7 @@ import { generateRandomString, getAuthToken, titleCase } from 'src/common/util';
 import { PrismaService } from '../prisma.service';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { InitRequestDto } from './dto/init-request.dto';
+import { InitResponseDto } from './dto/init-response.dto';
 import { ConfirmRequestDto } from './dto/confirm-request.dto';
 import { SearchBenefitsDto } from './dto/search-benefits.dto';
 import { ConfirmResponseDto } from './dto/confirm-response.dto';
@@ -266,7 +267,7 @@ export class BenefitsService {
 		}
 	}
 
-		async init(initRequestDto: InitRequestDto): Promise<any> {
+		async init(initRequestDto: InitRequestDto): Promise<InitResponseDto> {
 			// Validate BAP ID and URI
 			this.checkBapIdAndUri(
 				initRequestDto?.context?.bap_id,
@@ -278,7 +279,7 @@ export class BenefitsService {
 			const applicationData = initRequestDto?.message?.order?.fulfillments[0]?.customer?.applicationData;
 
 				if (applicationData) {
-					console.log('Extracted applicationData:', JSON.stringify(applicationData, null, 2));
+					// Application data extracted successfully
 				} else {
 					console.log('No applicationData found in payload');
 					throw new BadRequestException('ApplicationData is required in payload');
@@ -337,24 +338,28 @@ export class BenefitsService {
 					...mappedResponse?.context,
 				};
 
-								// Return only ONEST-compliant minimal response
+								// Return response in responses array format with context at root level
 								return {
-									context: initRequestDto.context,
-									message: {
-										order: {
-											providers: initRequestDto.message.order.providers?.map((provider: any) => ({
-												id: provider.id,
-												descriptor: provider.descriptor,
-												rateable: provider.rateable,
-												locations: provider.locations,
-												categories: provider.categories,
-											})),
-											items: initRequestDto.message.order.items?.map((item: any) => ({
-												id: item.id,
-												applicationId: item.applicationId,
-											})),
+									context: initRequestDto.context, // Add context at root level
+									responses: [{
+										context: initRequestDto.context,
+										// applicationId: applicationId, // Add applicationId in responses as well
+										message: {
+											order: {
+												providers: initRequestDto.message.order.providers?.map((provider: any) => ({
+													id: provider.id,
+													descriptor: provider.descriptor,
+													rateable: provider.rateable,
+													locations: provider.locations,
+													categories: provider.categories,
+												})),
+												items: initRequestDto.message.order.items?.map((item: any) => ({
+													id: item.id,
+													applicationId: item.applicationId,
+												})),
+											},
 										},
-									},
+									}]
 								};
 			} catch (error) {
 				if (error.isAxiosError) {
