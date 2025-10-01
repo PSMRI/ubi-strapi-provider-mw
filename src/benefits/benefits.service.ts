@@ -784,7 +784,7 @@ export class BenefitsService {
 						e.evidence,
 					short_desc: e.description,
 				},
-				value:  unsetObjectKeys(e, ['id']),
+				value: JSON.stringify(unsetObjectKeys(e, ['id'])),
 				display: true,
 			})),
 		};
@@ -804,7 +804,7 @@ export class BenefitsService {
 					code: doc.isRequired ? 'mandatory-doc' : 'optional-doc',
 					name: doc.isRequired ? 'Mandatory Document' : 'Optional Document',
 				},
-				value: unsetObjectKeys(doc, ['id']),
+				value: JSON.stringify(unsetObjectKeys(doc, ['id'])),
 				display: true,
 			})),
 		};
@@ -824,7 +824,7 @@ export class BenefitsService {
 					code: 'financial',
 					name: b.title,
 				},
-				value: unsetObjectKeys(b, ['id','__component']),	
+				value: JSON.stringify(unsetObjectKeys(b, ['id','__component'])),	
 				display: true,
 			})),
 		};
@@ -844,7 +844,7 @@ export class BenefitsService {
 					code: 'ineligibility',
 					name: 'Ineligibility Condition',
 				},
-				value: unsetObjectKeys(e, ['id']),
+				value: JSON.stringify(unsetObjectKeys(e, ['id'])),
 				display: true,
 			})),
 		};
@@ -864,7 +864,7 @@ export class BenefitsService {
 					code: 'sponsoringEntities',
 					name: 'Entities Sponsoring Benefits',
 				},
-				value: unsetObjectKeys(sponsoringEntity, ['id']),
+				value: JSON.stringify(unsetObjectKeys(sponsoringEntity, ['id'])),
 				display: true,
 			})),
 		};
@@ -901,7 +901,7 @@ export class BenefitsService {
 					code: 'applicationFormField-' + field.name,
 					name: 'Application Form Field - ' + field.label,
 				},
-				value: unsetObjectKeys(field, ['id']),
+				value: JSON.stringify(unsetObjectKeys(field, ['id'])),
 				display: true,
 			})),
 		};
