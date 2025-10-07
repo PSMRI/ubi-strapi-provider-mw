@@ -297,10 +297,10 @@ export class BenefitsService {
 				throw new BadRequestException(`Benefit ${benefitId} not found`);
 			}
 
-			// Add bapId to applicationData for application creation
+			// Add benefitId to applicationData for application creation
 			const applicationDataWithContext = {
 				...applicationData,
-				bapId: initRequestDto.context.bap_id,
+				benefitId: benefitId,
 			};
 
 			// Create the application and get the real applicationId
@@ -330,41 +330,22 @@ export class BenefitsService {
 			}
 			items[0].applicationId = applicationId;
 
-				initRequestDto.message.order = {
-					...initRequestDto.message.order,
-					// Ensure the object matches the InitOrderDto type
-					providers: [{ id, descriptor, rateable, locations, categories }],
-					items,
-				};
-
-				initRequestDto.context = {
-					...initRequestDto.context,
-					...mappedResponse?.context,
-				};
-
-								// Return response in responses array format with context at root level
-								return {
-									context: initRequestDto.context, // Add context at root level
-									responses: [{
-										context: initRequestDto.context,
-										// applicationId: applicationId, // Add applicationId in responses as well
-										message: {
-											order: {
-												providers: initRequestDto.message.order.providers?.map((provider: any) => ({
-													id: provider.id,
-													descriptor: provider.descriptor,
-													rateable: provider.rateable,
-													locations: provider.locations,
-													categories: provider.categories,
-												})),
-												items: initRequestDto.message.order.items?.map((item: any) => ({
-													id: item.id,
-													applicationId: item.applicationId,
-												})),
-											},
-										},
-									}]
-								};
+			// Return only the responses array structure expected by UI
+			return {
+				responses: [{
+					context: {
+						...initRequestDto.context,
+						...mappedResponse?.context,
+					},
+					message: {
+						order: {
+							providers: [{ id, descriptor, rateable, locations, categories }],
+							items,
+							fulfillments: initRequestDto.message.order.fulfillments
+						}
+					}
+				}]
+			};
 			} catch (error) {
 				if (error.isAxiosError) {
 					// Handle AxiosError and rethrow as HttpException
