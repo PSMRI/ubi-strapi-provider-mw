@@ -104,6 +104,4 @@ export class BenefitsController {
   async status(@Body() statusRequestDto: StatusRequestDto) {
     return this.benefitsService.status(statusRequestDto);
   }
-
-
 }
