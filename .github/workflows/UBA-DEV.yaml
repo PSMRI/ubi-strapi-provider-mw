@@ -1,19 +1,9 @@
 name: Deploy to UBA-DEV
 
 on:
-  workflow_dispatch:
-    inputs:
-      TAG:
-        description: 'Docker image tag to deploy'
-        required: true
-        default: 'latest'
-      BRANCH:
-        description: 'Git branch to deploy'
-        required: true
-        default: 'main'
   push:
-    tags:
-      - '*'  # Trigger deployment on any tag push
+    branches:
+      - '*'  # Trigger on any branch push
 
 jobs:
   Deploy_on_UBA_DEV:
@@ -22,65 +12,40 @@ jobs:
     environment: UBA-DEV
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Deploy Strapi Middleware via SSH
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.9
         with:
           host: ${{ secrets.HOST_NAME }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.PORT }}
           script: |
-            echo "🚀 Starting deployment on UBA-DEV..."
-
-            # ----- Set environment variables -----
+            # ----- Variables -----
             export BASE_DIR="${{ secrets.TARGET_DIR }}"
-            export REPO_NAME="ubi-strapi-provider-mw"
-            export REPO_URL="https://github.com/PSMRI/ubi-strapi-provider-mw.git"
-            export BRANCH="${{ github.event.inputs.BRANCH || 'main' }}"
-            export TAG="${{ github.event.inputs.TAG || github.ref_name || 'latest' }}"
-            export CONTAINER_NAME="ubi-strapi-provider-mw-onest"
+            export SERVICE_NAME="ubi-strapi-provider-mw-onest"
+            export TAG="latest"
 
-            echo "📁 Navigating to base directory: $BASE_DIR"
+            # Pass branch from runner to remote session
+            BRANCH="${{ github.ref_name }}"
+            echo "Deploying branch: $BRANCH"
+
+            # ----- Change to base directory -----
             cd "$BASE_DIR" || exit 1
 
-            echo "🧹 Cleaning up old files..."
-            if [ -d "$REPO_NAME" ]; then
-              rm -rf "$REPO_NAME"
-            fi
-
-            echo "📥 Cloning branch: $BRANCH from repo: $REPO_URL"
-            git clone -b "$BRANCH" "$REPO_URL"
-
-            cd "$REPO_NAME" || exit 1
-
-            echo "⚙️ Preparing environment file..."
+            # ----- Prepare .env -----
             if [ -f .env ]; then rm .env; fi
-            echo '${{ secrets.ENV }}' > .env
+            echo "${{ secrets.ENV }}" > .env
 
-            echo "🐳 Stopping old container if running..."
-            docker stop "$CONTAINER_NAME" || true
-            docker rm "$CONTAINER_NAME" || true
+            # ----- Ensure deploy.sh is executable -----
+            chmod +x deploy.sh
 
-            echo "🔄 Pulling Docker image with tag: $TAG"
-            docker pull ghcr.io/psmri/ubi-strapi-provider-mw:"$TAG"
+            # ----- Run deploy.sh with environment variables -----
+            BRANCH="$BRANCH" SERVICE_NAME="$SERVICE_NAME" TAG="$TAG" ./deploy.sh
 
-            echo "🚢 Starting new container..."
-            docker run -d \
-              --name "$CONTAINER_NAME" \
-              --env-file .env \
-              -p 1338:1338 \
-              ghcr.io/psmri/ubi-strapi-provider-mw:"$TAG"
-
-            echo "✅ Deployment complete for tag: $TAG"
-
-      - name: Notify Slack Channel
+      - name: Notify on Slack
         uses: iRoachie/slack-github-actions@v2.3.2
-        if: ${{ always() }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           status: ${{ job.status }}
-          fields: repo,commit,author
+        if: ${{ always() }}
