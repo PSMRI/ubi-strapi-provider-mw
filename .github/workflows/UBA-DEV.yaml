@@ -40,7 +40,7 @@ jobs:
 
             # ----- Prepare .env -----
             if [ -f .env ]; then rm .env; fi
-            echo "${{ secrets.DEV_ENV }}" > .env
+            echo "${{ secrets.ENV }}" > .env
 
             # ----- Ensure deploy.sh is executable -----
             chmod +x deploy.sh
