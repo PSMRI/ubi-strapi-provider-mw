@@ -340,8 +340,7 @@ export class BenefitsService {
 					message: {
 						order: {
 							providers: [{ id, descriptor, rateable, locations, categories }],
-							items,
-							fulfillments: initRequestDto.message.order.fulfillments
+							items
 						}
 					}
 				}]
