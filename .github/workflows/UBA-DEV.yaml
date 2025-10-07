@@ -31,6 +31,7 @@ jobs:
             export REPO_NAME="ubi-strapi-provider-mw"
             export REPO_URL="https://github.com/PSMRI/ubi-strapi-provider-mw.git"
             export TAG="latest"
+            export CONTAINER_NAME="ubi-strapi-provider-mw-onest"
 
             # Pass branch from runner to remote session
             BRANCH="${{ github.ref_name }}"
@@ -47,7 +48,7 @@ jobs:
             chmod +x deploy.sh
 
             # ----- Run deploy.sh with environment variables -----
-            BRANCH="$BRANCH" SERVICE_NAME="$SERVICE_NAME" TAG="$TAG" REPO_NAME="$REPO_NAME" REPO_URL="$REPO_URL" ./deploy.sh
+            BRANCH="$BRANCH" SERVICE_NAME="$SERVICE_NAME" TAG="$TAG" REPO_NAME="$REPO_NAME" REPO_URL="$REPO_URL" CONTAINER_NAME="$CONTAINER_NAME" ./deploy.sh
 
       - name: Notify Slack Channel
         uses: iRoachie/slack-github-actions@v2.3.2
