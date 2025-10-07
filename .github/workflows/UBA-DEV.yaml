@@ -27,8 +27,9 @@ jobs:
 
             # ----- Variables -----
             export BASE_DIR="${{ secrets.TARGET_DIR }}"
-            export SERVICE_NAME="ubi-strapi-provider-mw-onest"
+            export SERVICE_NAME="strapi"
             export REPO_NAME="ubi-strapi-provider-mw"
+            export REPO_URL="https://github.com/PSMRI/ubi-strapi-provider-mw.git"
             export TAG="latest"
 
             # Pass branch from runner to remote session
@@ -40,13 +41,13 @@ jobs:
 
             # ----- Prepare .env -----
             if [ -f .env ]; then rm .env; fi
-            echo "${{ secrets.ENV }}" > .env
+            echo "${{ secrets.DEV_ENV }}" > .env
 
             # ----- Ensure deploy.sh is executable -----
             chmod +x deploy.sh
 
             # ----- Run deploy.sh with environment variables -----
-            BRANCH="$BRANCH" SERVICE_NAME="$SERVICE_NAME" TAG="$TAG" REPO_NAME="$REPO_NAME" ./deploy.sh
+            BRANCH="$BRANCH" SERVICE_NAME="$SERVICE_NAME" TAG="$TAG" REPO_NAME="$REPO_NAME" REPO_URL="$REPO_URL" ./deploy.sh
 
       - name: Notify Slack Channel
         uses: iRoachie/slack-github-actions@v2.3.2
