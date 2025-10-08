@@ -1,0 +1,60 @@
+name: Deploy to UBA-DEV
+
+on:
+  push:
+    branches:
+      - '*'  # Trigger on any branch push
+
+jobs:
+  Deploy_on_UBA_DEV:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: UBA-DEV
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy Strapi Middleware via SSH
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.HOST_NAME }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            echo "🚀 Starting UBA-DEV deployment..."
+
+            # ----- Variables -----
+            export BASE_DIR="${{ secrets.TARGET_DIR }}"
+            export SERVICE_NAME="strapi"
+            export REPO_NAME="ubi-strapi-provider-mw"
+            export REPO_URL="https://github.com/PSMRI/ubi-strapi-provider-mw.git"
+            export TAG="latest"
+            export CONTAINER_NAME="ubi-strapi-provider-mw-onest"
+
+            # Pass branch from runner to remote session
+            BRANCH="${{ github.ref_name }}"
+            echo "Deploying branch: $BRANCH"
+
+            # ----- Change to base directory -----
+            cd "$BASE_DIR" || exit 1
+
+            # ----- Prepare .env -----
+            if [ -f .env ]; then rm .env; fi
+            echo "${{ secrets.DEV_ENV }}" > .env
+
+            # ----- Ensure deploy.sh is executable -----
+            chmod +x deploy.sh
+
+            # ----- Run deploy.sh with environment variables -----
+            BRANCH="$BRANCH" SERVICE_NAME="$SERVICE_NAME" TAG="$TAG" REPO_NAME="$REPO_NAME" REPO_URL="$REPO_URL" CONTAINER_NAME="$CONTAINER_NAME" ./deploy.sh
+
+      - name: Notify Slack Channel
+        uses: iRoachie/slack-github-actions@v2.3.2
+        if: ${{ always() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          fields: repo,commit,author
