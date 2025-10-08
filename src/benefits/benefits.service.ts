@@ -234,7 +234,7 @@ export class BenefitsService {
 		throw new BadRequestException('Invalid domain provided');
 	}
 
-	async selectBenefitsById(body: SelectRequestDto): Promise<{ responses: SelectResponseDto[] }> {
+	async selectBenefitsById(body: SelectRequestDto): Promise<SelectResponseDto> {
 		this.checkBapIdAndUri(body?.context?.bap_id, body?.context?.bap_uri);
 		try {
 			let id = body.message.order.items[0].id;
@@ -249,10 +249,8 @@ export class BenefitsService {
         );
       }
 
-			// Wrap the response in responses array for UI compatibility
-			return {
-				responses: [mappedResponse]
-			};
+	  return mappedResponse;
+
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
