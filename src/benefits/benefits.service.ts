@@ -234,7 +234,7 @@ export class BenefitsService {
 		throw new BadRequestException('Invalid domain provided');
 	}
 
-	async selectBenefitsById(body: SelectRequestDto): Promise<SelectResponseDto> {
+	async selectBenefitsById(body: SelectRequestDto): Promise<{ responses: SelectResponseDto[] }> {
 		this.checkBapIdAndUri(body?.context?.bap_id, body?.context?.bap_uri);
 		try {
 			let id = body.message.order.items[0].id;
