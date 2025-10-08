@@ -330,20 +330,17 @@ export class BenefitsService {
 			}
 			items[0].applicationId = applicationId;
 
-			// Return only the responses array structure expected by UI
 			return {
-				responses: [{
-					context: {
-						...initRequestDto.context,
-						...mappedResponse?.context,
-					},
-					message: {
-						order: {
-							providers: [{ id, descriptor, rateable, locations, categories }],
-							items
-						}
+				context: {
+					...initRequestDto.context,
+					...mappedResponse?.context,
+				},
+				message: {
+					order: {
+						providers: [{ id, descriptor, rateable, locations, categories }],
+						items
 					}
-				}]
+				}
 			};
 			} catch (error) {
 				if (error.isAxiosError) {

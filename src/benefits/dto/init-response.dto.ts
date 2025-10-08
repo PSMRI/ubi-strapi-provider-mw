@@ -1,14 +1,22 @@
-import { IsArray, IsNotEmpty } from 'class-validator';
+import { IsObject, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class InitResponseDto {
   @ApiProperty({ 
-    description: 'Array of responses containing message data',
-    example: [{ context: {}, message: {} }]
+    description: 'Context object containing request context data',
+    example: {}
   })
-  @IsArray()
+  @IsObject()
   @IsNotEmpty()
-  responses: any[];
+  context: any;
+
+  @ApiProperty({
+    description: 'Message object containing order and provider data',
+    example: {}
+  })
+  @IsObject()
+  @IsNotEmpty()
+  message: any;
 
   [key: string]: any;
 }
