@@ -61,7 +61,7 @@ export class EligibilityStatusUpdate {
 		for (const application of applications) {
 			try {
 				const getBenefit = await this.benefitsService.getBenefitsByIdStrapi(application?.benefitId)
-				const benefitDetails = getBenefit?.data?.data
+				const benefitDetails = getBenefit?.data // fix CRON
 				if (benefitDetails) {
 					const formatEligiblityPayload = await this.applicationsService.formatEligibility(
 						benefitDetails,

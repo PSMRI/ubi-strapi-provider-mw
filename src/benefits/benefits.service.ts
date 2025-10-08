@@ -17,6 +17,7 @@ import { generateRandomString, getAuthToken, titleCase, unsetObjectKeys } from '
 import { PrismaService } from '../prisma.service';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { InitRequestDto } from './dto/init-request.dto';
+import { InitResponseDto } from './dto/init-response.dto';
 import { ConfirmRequestDto } from './dto/confirm-request.dto';
 import { SearchBenefitsDto } from './dto/search-benefits.dto';
 import { ConfirmResponseDto } from './dto/confirm-response.dto';
@@ -233,7 +234,7 @@ export class BenefitsService {
 		throw new BadRequestException('Invalid domain provided');
 	}
 
-	async selectBenefitsById(body: SelectRequestDto): Promise<SelectResponseDto> {
+	async selectBenefitsById(body: SelectRequestDto): Promise<{ responses: SelectResponseDto[] }> {
 		this.checkBapIdAndUri(body?.context?.bap_id, body?.context?.bap_uri);
 		try {
 			let id = body.message.order.items[0].id;
@@ -248,7 +249,10 @@ export class BenefitsService {
         );
       }
 
-			return mappedResponse;
+			// Wrap the response in responses array for UI compatibility
+			return {
+				responses: [mappedResponse]
+			};
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
@@ -263,77 +267,94 @@ export class BenefitsService {
 		}
 	}
 
-	async init(selectDto: InitRequestDto): Promise<any> {
-		this.checkBapIdAndUri(
-			selectDto?.context?.bap_id,
-			selectDto?.context?.bap_uri,
-		);
-		try {
-			const benefitId = selectDto.message.order.items[0].id;
+		async init(initRequestDto: InitRequestDto): Promise<InitResponseDto> {
+			// Validate BAP ID and URI
+			this.checkBapIdAndUri(
+				initRequestDto?.context?.bap_id,
+				initRequestDto?.context?.bap_uri,
+			);
 
-			// Fetch benefit data from the Strapi API
+			try {
+			// Extract applicationData from the payload
+			const applicationData = initRequestDto?.message?.order?.fulfillments?.[0]?.customer?.applicationData;
+
+				if (applicationData) {
+					// Application data extracted successfully
+				} else {
+					console.log('No applicationData found in payload');
+					throw new BadRequestException('ApplicationData is required in payload');
+				}
+
+			const item = initRequestDto?.message?.order?.items?.[0];
+			if (!item?.id) {
+				throw new BadRequestException('message.order.items[0].id is required');
+			}
+			const benefitId = item.id;
+
+			// Validate benefit exists before creating application
 			const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+			if (!benefitData?.data) {
+				throw new BadRequestException(`Benefit ${benefitId} not found`);
+			}
 
-			let mappedResponse;
-
-      if (benefitData?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          selectDto,
-          [benefitData?.data?.data],
-          'on_init',
-        );
-      }
-
-			const xinput = {
-				head: {
-					descriptor: {
-						name: 'Application Form',
-					},
-					index: {
-						min: 0,
-						cur: 0,
-						max: 1,
-					},
-					headings: ['Personal Details'],
-				},
-				form: {
-					url: `${this.providerUrl}/benefit/apply/${benefitId}`, // React route for the benefit ID
-					mime_type: 'text/html',
-					resubmit: false,
-				},
-				required: true,
+			// Add benefitId to applicationData for application creation
+			const applicationDataWithContext = {
+				...applicationData,
+				benefitId: benefitId,
 			};
+
+			// Create the application and get the real applicationId
+			const createdApplication = await this.applicationsService.create(applicationDataWithContext);
+			const applicationId = createdApplication.application.id;
+
+				let mappedResponse;
+
+				if (benefitData?.data) {
+					mappedResponse = await this.transformScholarshipsToOnestFormat(
+						initRequestDto,
+						[benefitData?.data?.data],
+						'on_init',
+					);
+				}
 
 			const { id, descriptor, categories, locations, items, rateable }: any =
 				mappedResponse?.message.catalog.providers?.[0] ?? {};
 
-			items[0].xinput = xinput;
-
-			selectDto.message.order = {
-				...selectDto.message.order,
-				// Ensure the object matches the InitOrderDto type
-				providers: [{ id, descriptor, rateable, locations, categories }],
-				items,
-			};
-
-			selectDto.context = {
-				...selectDto.context,
-				...mappedResponse?.context,
-			};
-			return selectDto;
-		} catch (error) {
-			if (error.isAxiosError) {
-				// Handle AxiosError and rethrow as HttpException
-				throw new HttpException(
-					error.response?.data?.message ?? 'Benefit not found',
-					error.response?.status ?? HttpStatus.NOT_FOUND,
-				);
+			if (!items || !id) {
+				throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
 			}
 
-			console.error('Error in handleInit:', error);
-			throw new InternalServerErrorException('Failed to initialize benefit');
+			// Add real applicationId to the first item
+			if (!items?.[0]) {
+				throw new InternalServerErrorException('No items found in transformed benefit data');
+			}
+			items[0].applicationId = applicationId;
+
+			return {
+				context: {
+					...initRequestDto.context,
+					...mappedResponse?.context,
+				},
+				message: {
+					order: {
+						providers: [{ id, descriptor, rateable, locations, categories }],
+						items
+					}
+				}
+			};
+			} catch (error) {
+				if (error.isAxiosError) {
+					// Handle AxiosError and rethrow as HttpException
+					throw new HttpException(
+						error.response?.data?.message ?? 'Benefit not found',
+						error.response?.status ?? HttpStatus.NOT_FOUND,
+					);
+				}
+
+				console.error('Error in init:', error);
+				throw new InternalServerErrorException('Failed to initialize benefit');
+			}
 		}
-	}
 
 	async confirm(confirmDto: ConfirmRequestDto): Promise<any> {
 		this.checkBapIdAndUri(
