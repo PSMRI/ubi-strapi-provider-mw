@@ -249,10 +249,8 @@ export class BenefitsService {
         );
       }
 
-			// Wrap the response in responses array for UI compatibility
-			return {
-				responses: [mappedResponse]
-			};
+	  return mappedResponse;
+
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
