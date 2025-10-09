@@ -70,57 +70,93 @@ export class ApplicationsService {
 		return `${basePath}/${certificateType}/${fileName}`;
 	}
 
-	// Create a new application (new VC documents format only)
+	/**
+	 * Always creates a new application (no orderId matching)
+	 */
 	async create(data: any) {
-		// Step 1: Process new VC documents format (validation handled by DTO)
+		// Step 1: Process and validate input data
 		const { vcDocuments, applicationFields } = this.processNewFormat(data);
-
-		// Step 2: Extract required identifiers
 		const benefitId = data.benefitId;
 		if (!benefitId) throw new BadRequestException('benefitId is required');
-
+		// Step 2: Extract and prepare application metadata
 		const bapId = data.bapId ?? data.bapid ?? data.bapID ?? null;
 		const orderId = data.orderId ?? null;
-
-		// Step 3: Either create a new application or update existing one if orderId is matched
-		const { application, isUpdate } = await this.findOrCreateApplication({
-			orderId,
-			benefitId,
-			bapId,
-			normalFields: applicationFields,
+		const customerId = uuidv4();
+		
+		// Step 3: Create action log entry for tracking
+		const actionLogEntry = this.getActionLogEntry(
+			{
+				os: applicationFields.os || 'Unknown',
+				browser: applicationFields.browser || 'Unknown',
+				updatedBy: applicationFields.updatedBy || 0,
+				ip: applicationFields.ip || 'Unknown',
+				updatedAt: new Date(),
+			},
+			'application_submitted',
+			null
+		);
+		
+		// Step 4: Create application record in database
+		const application = await this.prisma.applications.create({
+			data: {
+				benefitId,
+				status: 'pending',
+				customerId,
+				bapId,
+				applicationData: JSON.stringify(applicationFields),
+				orderId,
+				actionLog: [actionLogEntry],
+			},
 		});
-
-		// Step 4: Determine whether it was an update or a new creation
-		const applicationId = application.id;
-
-		// Step 5: Handle VC document uploads (can be empty array)
+		
+		// Step 5: Process and upload application files
 		const applicationFiles = await this.processApplicationFiles(
-			applicationId,
+			application.id,
 			vcDocuments,
-		);	
+		);
 		
-		if(isUpdate){
-			await this.prisma.applications.update({
-				where: { id: applicationId },
-				data: {
-					calculatedAmount: Prisma.DbNull,
-					calculationsProcessedAt: null,
-					eligibilityCheckedAt: null,
-					eligibilityResult: Prisma.DbNull,
-					eligibilityStatus: 'pending',
-					documentVerificationStatus: null,
-					updatedAt: new Date(),
-				},
-			});
-		}
-		
-		// Step 6: Return result
+		// Step 6: Return created application with files
 		return {
 			application,
 			applicationFiles,
-			message: isUpdate
-				? 'Application updated with resubmitted data.'
-				: 'New application created.',
+			message: 'New application created.',
+		};
+	}
+
+	/**
+	 * Always updates an existing application by orderId
+	 */
+	async updateApplication(orderId: string, data: any) {
+		// Step 1: Process and validate input data
+		const { vcDocuments, applicationFields } = this.processNewFormat(data);
+		
+		// Step 2: Find existing application by orderId
+		const existing = await this.prisma.applications.findFirst({
+			where: { orderId },
+		});
+		if (!existing) throw new NotFoundException('Application not found for update');
+		
+		// Step 3: Update application record in database
+		await this.prisma.applications.update({
+			where: { id: existing.id },
+			data: {
+				applicationData: JSON.stringify(applicationFields),
+				status: 'pending',
+				updatedAt: new Date(),
+			},
+		});
+		
+		// Step 4: Process and upload new application files
+		const applicationFiles = await this.processApplicationFiles(
+			existing.id,
+			vcDocuments,
+		);
+		
+		// Step 5: Return updated application with files
+		return {
+			application: { ...existing, ...applicationFields },
+			applicationFiles,
+			message: 'Application updated.',
 		};
 	}
 

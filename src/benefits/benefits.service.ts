@@ -356,6 +356,78 @@ export class BenefitsService {
 			}
 		}
 
+	/**
+	 * DSEP Update endpoint: always updates an existing application by orderId
+	 */
+	async update(data: any): Promise<any> {
+		// Extract orderId and applicationData
+		const orderId = data?.message?.order?.fulfillments?.[0]?.customer?.applicationData?.orderId ?? null;
+		if (!orderId) throw new BadRequestException('orderId is required for update');
+		const applicationData = data?.message?.order?.fulfillments?.[0]?.customer?.applicationData ?? {};
+		if (!applicationData || Object.keys(applicationData).length === 0) {
+			throw new BadRequestException('applicationData is required for update');
+		}
+
+		// Get benefitId from items[0].id
+		const item = data?.message?.order?.items?.[0];
+		if (!item?.id) {
+			throw new BadRequestException('message.order.items[0].id is required');
+		}
+		const benefitId = item.id;
+
+		// Validate benefit exists before updating application
+		const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+		if (!benefitData?.data) {
+			throw new BadRequestException(`Benefit ${benefitId} not found`);
+		}
+
+		// Add benefitId to applicationData for update
+		const applicationDataWithContext = {
+			...applicationData,
+			benefitId: benefitId,
+		};
+
+		// Update the application and get the real applicationId
+		const updatedApplication = await this.applicationsService.updateApplication(orderId, applicationDataWithContext);
+		const applicationId = updatedApplication.application.id ?? null;
+
+		let mappedResponse;
+		if (benefitData?.data) {
+			mappedResponse = await this.transformScholarshipsToOnestFormat(
+				data,
+				[benefitData?.data?.data],
+				'on_update',
+			);
+		}
+
+		const { id, descriptor, categories, locations, items, rateable }: any =
+			mappedResponse?.message.catalog.providers?.[0] ?? {};
+
+		if (!items || !id) {
+			throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
+		}
+
+		// Add real applicationId to the first item
+		if (!items?.[0]) {
+			throw new InternalServerErrorException('No items found in transformed benefit data');
+		}
+		items[0].applicationId = applicationId;
+
+		// Return context and message - responses[0] will come from network layer
+		return {
+			context: {
+				...data.context,
+				...mappedResponse?.context,
+			},
+			message: {
+				order: {
+					providers: [{ id, descriptor, rateable, locations, categories }],
+					items
+				}
+			}
+		};
+	}
+
 	async confirm(confirmDto: ConfirmRequestDto): Promise<any> {
 		this.checkBapIdAndUri(
 			confirmDto?.context?.bap_id,
@@ -440,6 +512,7 @@ export class BenefitsService {
 
 			// Extract order ID from the request body
 			const orderId = statusDto?.message?.order_id;
+			console.log('Status check for orderId:', orderId);
 
 			// Fetch application details using the order ID
 			const applicationData = await this.applicationsService.find({
