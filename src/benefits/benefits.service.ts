@@ -358,6 +358,12 @@ export class BenefitsService {
 	 * DSEP Update endpoint: always updates an existing application by orderId
 	 */
 	async update(data: any): Promise<any> {
+		// Validate BAP ID and URI
+		this.checkBapIdAndUri(
+			data?.context?.bap_id,
+			data?.context?.bap_uri,
+		);
+
 		// Extract orderId and applicationData
 		const orderId = data?.message?.order?.fulfillments?.[0]?.customer?.applicationData?.orderId ?? null;
 		if (!orderId) throw new BadRequestException('orderId is required for update');

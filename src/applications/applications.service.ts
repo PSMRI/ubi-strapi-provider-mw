@@ -136,23 +136,45 @@ export class ApplicationsService {
 		});
 		if (!existing) throw new NotFoundException('Application not found for update');
 		
-		// Step 3: Update application record in database
+		// Step 3: Handle resubmission bookkeeping - create action log entry
+		const actionLogEntry = this.getActionLogEntry(
+			{
+				os: applicationFields.os || 'Unknown',
+				browser: applicationFields.browser || 'Unknown',
+				updatedBy: applicationFields.updatedBy || 0,
+				ip: applicationFields.ip || 'Unknown',
+				updatedAt: new Date(),
+			},
+			'application_resubmitted',
+			null,
+		);
+
+		// Step 4: Delete existing application files for clean resubmission
+		await this.prisma.applicationFiles.deleteMany({
+			where: { applicationId: existing.id },
+		});
+
+		// Step 5: Update application record in database
 		await this.prisma.applications.update({
 			where: { id: existing.id },
 			data: {
 				applicationData: JSON.stringify(applicationFields),
 				status: 'pending',
 				updatedAt: new Date(),
+				remark: null,
+				actionLog: Array.isArray(existing.actionLog)
+					? [...existing.actionLog, actionLogEntry]
+					: [actionLogEntry],
 			},
 		});
 		
-		// Step 4: Process and upload new application files
+		// Step 6: Process and upload new application files
 		const applicationFiles = await this.processApplicationFiles(
 			existing.id,
 			vcDocuments,
 		);
 		
-		// Step 5: Return updated application with files
+		// Step 7: Return updated application with files
 		return {
 			application: { ...existing, ...applicationFields },
 			applicationFiles,
