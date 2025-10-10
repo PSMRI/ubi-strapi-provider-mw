@@ -34,7 +34,7 @@ type ApplicationData = Record<string, any>;
 @Injectable()
 export class ApplicationsService {
 	private readonly eligibility_base_uri: string;
-	
+
 	constructor(
 		private readonly prisma: PrismaService,
 		@Inject(forwardRef(() => BenefitsService))
@@ -70,57 +70,147 @@ export class ApplicationsService {
 		return `${basePath}/${certificateType}/${fileName}`;
 	}
 
-	// Create a new application (new VC documents format only)
+	/**
+	 * Always creates a new application (no orderId matching)
+	 */
 	async create(data: any) {
-		// Step 1: Process new VC documents format (validation handled by DTO)
+		// Step 1: Process and validate input data
 		const { vcDocuments, applicationFields } = this.processNewFormat(data);
-
-		// Step 2: Extract required identifiers
 		const benefitId = data.benefitId;
 		if (!benefitId) throw new BadRequestException('benefitId is required');
 
+		// Extract transactionId from data
+		const transactionId = data.transactionId ?? null;
+
+		// Step 2: Extract and prepare application metadata
 		const bapId = data.bapId ?? data.bapid ?? data.bapID ?? null;
 		const orderId = data.orderId ?? null;
+		const customerId = uuidv4();
 
-		// Step 3: Either create a new application or update existing one if orderId is matched
-		const { application, isUpdate } = await this.findOrCreateApplication({
-			orderId,
-			benefitId,
-			bapId,
-			normalFields: applicationFields,
+		// Step 3: Create action log entry for tracking
+		const actionLogEntry = this.getActionLogEntry(
+			{
+				os: applicationFields.os || 'Unknown',
+				browser: applicationFields.browser || 'Unknown',
+				updatedBy: applicationFields.updatedBy || 0,
+				ip: applicationFields.ip || 'Unknown',
+				updatedAt: new Date(),
+			},
+			'application_submitted',
+			null
+		);
+
+		// Step 4: Create application record in database
+		const application = await this.prisma.applications.create({
+			data: {
+				benefitId,
+				status: 'pending',
+				customerId,
+				bapId,
+				applicationData: JSON.stringify(applicationFields),
+				orderId,
+				transactionId,
+				actionLog: [actionLogEntry],
+			},
 		});
 
-		// Step 4: Determine whether it was an update or a new creation
-		const applicationId = application.id;
-
-		// Step 5: Handle VC document uploads (can be empty array)
+		// Step 5: Process and upload application files
 		const applicationFiles = await this.processApplicationFiles(
-			applicationId,
+			application.id,
 			vcDocuments,
-		);	
-		
-		if(isUpdate){
-			await this.prisma.applications.update({
-				where: { id: applicationId },
-				data: {
-					calculatedAmount: Prisma.DbNull,
-					calculationsProcessedAt: null,
-					eligibilityCheckedAt: null,
-					eligibilityResult: Prisma.DbNull,
-					eligibilityStatus: 'pending',
-					documentVerificationStatus: null,
-					updatedAt: new Date(),
-				},
-			});
-		}
-		
-		// Step 6: Return result
+		);
+
+		// Step 6: Return created application with files
 		return {
 			application,
 			applicationFiles,
-			message: isUpdate
-				? 'Application updated with resubmitted data.'
-				: 'New application created.',
+			message: 'New application created.',
+		};
+	}
+
+	/**
+	 * Always updates an existing application by id (primary key)
+	 */
+	async updateApplication(applicationId: string, data: any) {
+		// Step 1: Process and validate input data
+		const { vcDocuments, applicationFields } = this.processNewFormat(data);
+
+		// Extract transactionId from data
+		const transactionId = data.transactionId ?? null;
+
+		// Validate applicationId is a valid integer
+		const parsedId = parseInt(applicationId, 10);
+		if (isNaN(parsedId) || parsedId <= 0) {
+			throw new BadRequestException(`Invalid applicationId: ${applicationId}`);
+		}
+
+		// Step 2: Find existing application by id and optionally transactionId
+		let whereClause: any = { id: parsedId };
+		if (transactionId) {
+			whereClause.transactionId = transactionId;
+		}
+
+		const existing = await this.prisma.applications.findFirst({
+			where: whereClause,
+		});
+		if (!existing) {
+			const errorMessage = transactionId
+				? `Application not found for the given id: ${applicationId} and transactionId: ${transactionId}`
+				: `Application not found for id: ${applicationId}`;
+			throw new NotFoundException(errorMessage);
+		}
+
+		// Step 3: Handle resubmission bookkeeping - create action log entry
+		const actionLogEntry = this.getActionLogEntry(
+			{
+				os: applicationFields.os || 'Unknown',
+				browser: applicationFields.browser || 'Unknown',
+				updatedBy: applicationFields.updatedBy || 0,
+				ip: applicationFields.ip || 'Unknown',
+				updatedAt: new Date(),
+			},
+			'application_resubmitted',
+			null,
+		);
+
+		// Step 4: Delete existing application files for clean resubmission
+		await this.prisma.applicationFiles.deleteMany({
+			where: { applicationId: existing.id },
+		});
+
+		// Step 5: Update application record in database and capture the result
+		const updatedApplication = await this.prisma.applications.update({
+			where: { id: existing.id },
+			data: {
+				applicationData: JSON.stringify(applicationFields),
+				status: 'pending',
+				updatedAt: new Date(),
+				remark: null,
+				transactionId,
+				actionLog: Array.isArray(existing.actionLog)
+					? [...existing.actionLog, actionLogEntry]
+					: [actionLogEntry],
+				// Reset calculation and eligibility data for resubmission
+				calculatedAmount: Prisma.DbNull,
+				calculationsProcessedAt: null,
+				eligibilityCheckedAt: null,
+				eligibilityResult: Prisma.DbNull,
+				eligibilityStatus: 'pending',
+				documentVerificationStatus: null,
+			},
+		});
+
+		// Step 6: Process and upload new application files
+		const applicationFiles = await this.processApplicationFiles(
+			existing.id,
+			vcDocuments,
+		);
+
+		// Step 7: Return updated application with files
+		return {
+			application: updatedApplication,
+			applicationFiles,
+			message: 'Application updated with resubmitted data.',
 		};
 	}
 
@@ -145,7 +235,7 @@ export class ApplicationsService {
 		});
 
 		// Extract all other fields as application data (excluding control fields)
-		const excludeFields = ['vc_documents', 'benefitId', 'orderId', 'bapId', 'status', 'applicationData', 'customerId'];
+		const excludeFields = ['vc_documents', 'benefitId', 'orderId', 'bapId', 'status', 'applicationData', 'customerId', 'transactionId'];
 		for (const [key, value] of Object.entries(data)) {
 			if (!excludeFields.includes(key) && !key.startsWith('_') && value !== undefined) {
 				applicationFields[key] = value;
@@ -227,7 +317,7 @@ export class ApplicationsService {
 
 		// Create new application if no existing one found
 		const customerId = uuidv4();
-		
+
 		// Create action log entry for new submission
 		const actionLogEntry = this.getActionLogEntry(
 			{
@@ -395,7 +485,7 @@ export class ApplicationsService {
 				'You do not have permission to view this application',
 			);
 		}
-		
+
 		try {
 			await this.calculateBenefit(id, authToken);
 		} catch (err) {
@@ -773,8 +863,8 @@ export class ApplicationsService {
 						const matches = condition.ifExpr
 							? this.evaluateIfExpr(condition.ifExpr, applicationData)
 							: Object.entries(condition.if).every(
-									([k, v]) => applicationData[k] === v,
-								);
+								([k, v]) => applicationData[k] === v,
+							);
 
 						if (matches) {
 							if (condition.then.amount === 'value') {
@@ -891,7 +981,7 @@ export class ApplicationsService {
 				`Benefit with ID ${application.benefitId} not found`,
 			);
 		}
-		
+
 		const strictCheck = req?.query?.strictCheck === 'true';
 		const formatEligiblityPayload = await this.formatEligibility(
 			benefitDefinition?.data,
@@ -903,17 +993,17 @@ export class ApplicationsService {
 			formatEligiblityPayload?.eligibilityRules,
 			formatEligiblityPayload?.strictCheck,
 		);
-		
+
 		// Calculate eligibility percentage and add it to userDetails
 		const eligibilityPercentage = this.calculateEligibilityPercentage(eligibilityResult);
-		
+
 		// Add percentage to the first user's details
 		if (eligibilityResult?.eligibleUsers?.[0]?.details) {
 			eligibilityResult.eligibleUsers[0].details.eligibilityPercentage = eligibilityPercentage;
 		} else if (eligibilityResult?.ineligibleUsers?.[0]?.details) {
 			eligibilityResult.ineligibleUsers[0].details.eligibilityPercentage = eligibilityPercentage;
 		}
-		
+
 		let eligibilityStatus = 'ineligible'; // Default status
 		if (eligibilityResult?.eligibleUsers?.length > 0) {
 			eligibilityStatus = 'eligible'; // Set to eligible if any users are eligible default we sending one application here
@@ -934,9 +1024,9 @@ export class ApplicationsService {
 	 */
 	private calculateEligibilityPercentage(eligibilityResult: any): number {
 		// Get the first user's criteria results (since we're checking one application at a time)
-		const userDetails = eligibilityResult?.eligibleUsers?.[0]?.details || 
-						   eligibilityResult?.ineligibleUsers?.[0]?.details;
-		
+		const userDetails = eligibilityResult?.eligibleUsers?.[0]?.details ||
+			eligibilityResult?.ineligibleUsers?.[0]?.details;
+
 		if (!userDetails?.criteriaResults || !Array.isArray(userDetails.criteriaResults)) {
 			return 0;
 		}
@@ -944,10 +1034,10 @@ export class ApplicationsService {
 		const criteriaResults = userDetails.criteriaResults;
 		const totalCriteria = criteriaResults.length;
 		const passedCriteria = criteriaResults.filter(criteria => Boolean(criteria.passed)).length;
-		
+
 		// Calculate percentage
 		const percentage = totalCriteria > 0 ? (passedCriteria / totalCriteria) * 100 : 0;
-		
+
 		// Round to 2 decimal places
 		return Math.round(percentage * 100) / 100;
 	}
@@ -996,7 +1086,7 @@ export class ApplicationsService {
 				// Prepare application profile for eligibility check
 				applicationId: application?.id,
 				...(typeof application?.applicationData === 'object' &&
-				application?.applicationData !== null
+					application?.applicationData !== null
 					? application.applicationData
 					: {}),
 				documentVerificationStatus: application?.documentVerificationStatus,
@@ -1128,9 +1218,9 @@ export class ApplicationsService {
 				...this.generateAppTableFields(app, applicationTableDataFields),
 				...(eligibilityResultColumnDataFields
 					? this.generateEligibilityFields(
-							app,
-							eligibilityResultColumnDataFields,
-						)
+						app,
+						eligibilityResultColumnDataFields,
+					)
 					: []),
 				...(eligibilityDetailsFields
 					? this.generateEligibilityDetailsFields(app, eligibilityDetailsFields)

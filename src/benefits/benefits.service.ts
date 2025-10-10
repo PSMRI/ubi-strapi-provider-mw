@@ -32,7 +32,7 @@ export class BenefitsService {
 	private readonly strapiUrl: string;
 	private readonly strapiToken: string;
 	private readonly providerUrl: string;
-  private readonly domain: string;
+	private readonly domain: string;
 	private readonly bppId: string;
 	private readonly bppUri: string;
 	private bapId: string;
@@ -62,7 +62,7 @@ export class BenefitsService {
 			!this.providerUrl.trim().length ||
 			!this.bppId.trim().length ||
 			!this.bppUri.trim().length ||
-      !this.domain.trim().length
+			!this.domain.trim().length
 		) {
 			throw new InternalServerErrorException(
 				'One or more required environment variables are missing or empty: STRAPI_URL, STRAPI_TOKEN, PROVIDER_UBA_UI_URL, BPP_ID, BPP_URI, DOMAIN',
@@ -199,13 +199,13 @@ export class BenefitsService {
 		}
 	}
 
-  async searchBenefits(searchRequest: SearchRequestDto, authToken?: string): Promise<SearchResponseDto> {
-    if (searchRequest.context.domain === this.domain) {
-      let url = `${this.strapiUrl}/api/benefits${this.urlExtension}`;
+	async searchBenefits(searchRequest: SearchRequestDto, authToken?: string): Promise<SearchResponseDto> {
+		if (searchRequest.context.domain === this.domain) {
+			let url = `${this.strapiUrl}/api/benefits${this.urlExtension}`;
 
-      // if (authToken) {
-      // url = `${this.strapiUrl}/content-manager/collection-types/api::benefit.benefit?${queryString}`;
-      //}
+			// if (authToken) {
+			// url = `${this.strapiUrl}/content-manager/collection-types/api::benefit.benefit?${queryString}`;
+			//}
 
 			this.checkBapIdAndUri(
 				searchRequest?.context?.bap_id,
@@ -218,15 +218,15 @@ export class BenefitsService {
 				},
 			});
 
-      let mappedResponse = new SearchResponseDto();
+			let mappedResponse = new SearchResponseDto();
 
-      if (response?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          searchRequest,
-          response?.data?.data,
-          'on_search',
-        );
-      }
+			if (response?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					searchRequest,
+					response?.data?.data,
+					'on_search',
+				);
+			}
 
 			return mappedResponse;
 		}
@@ -239,17 +239,17 @@ export class BenefitsService {
 		try {
 			let id = body.message.order.items[0].id;
 
-      const response = await this.getBenefitsByIdStrapi(id);
-      let mappedResponse;
-      if (response?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          body,
-          [response?.data?.data],
-          'on_select',
-        );
-      }
+			const response = await this.getBenefitsByIdStrapi(id);
+			let mappedResponse;
+			if (response?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					body,
+					[response?.data?.data],
+					'on_select',
+				);
+			}
 
-	  return mappedResponse;
+			return mappedResponse;
 
 		} catch (error) {
 			if (error.isAxiosError) {
@@ -265,23 +265,29 @@ export class BenefitsService {
 		}
 	}
 
-		async init(initRequestDto: InitRequestDto): Promise<InitResponseDto> {
-			// Validate BAP ID and URI
-			this.checkBapIdAndUri(
-				initRequestDto?.context?.bap_id,
-				initRequestDto?.context?.bap_uri,
-			);
+	async init(initRequestDto: InitRequestDto): Promise<InitResponseDto> {
+		// Validate BAP ID and URI
+		this.checkBapIdAndUri(
+			initRequestDto?.context?.bap_id,
+			initRequestDto?.context?.bap_uri,
+		);
 
-			try {
+		try {
 			// Extract applicationData from the payload
 			const applicationData = initRequestDto?.message?.order?.fulfillments?.[0]?.customer?.applicationData;
 
-				if (applicationData) {
-					// Application data extracted successfully
-				} else {
-					console.log('No applicationData found in payload');
-					throw new BadRequestException('ApplicationData is required in payload');
-				}
+			if (applicationData) {
+				// Application data extracted successfully
+			} else {
+				console.log('No applicationData found in payload');
+				throw new BadRequestException('ApplicationData is required in payload');
+			}
+
+			// Extract transaction_id from context
+			const transactionId = initRequestDto?.context?.transaction_id;
+			if (!transactionId) {
+				throw new BadRequestException('transaction_id is required in context');
+			}
 
 			const item = initRequestDto?.message?.order?.items?.[0];
 			if (!item?.id) {
@@ -295,25 +301,26 @@ export class BenefitsService {
 				throw new BadRequestException(`Benefit ${benefitId} not found`);
 			}
 
-			// Add benefitId to applicationData for application creation
+			// Add benefitId and transactionId to applicationData for application creation
 			const applicationDataWithContext = {
 				...applicationData,
 				benefitId: benefitId,
+				transactionId: transactionId,
 			};
 
 			// Create the application and get the real applicationId
 			const createdApplication = await this.applicationsService.create(applicationDataWithContext);
 			const applicationId = createdApplication.application.id;
 
-				let mappedResponse;
+			let mappedResponse;
 
-				if (benefitData?.data) {
-					mappedResponse = await this.transformScholarshipsToOnestFormat(
-						initRequestDto,
-						[benefitData?.data?.data],
-						'on_init',
-					);
-				}
+			if (benefitData?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					initRequestDto,
+					[benefitData?.data?.data],
+					'on_init',
+				);
+			}
 
 			const { id, descriptor, categories, locations, items, rateable }: any =
 				mappedResponse?.message.catalog.providers?.[0] ?? {};
@@ -322,11 +329,12 @@ export class BenefitsService {
 				throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
 			}
 
-			// Add real applicationId to the first item
+			// Add real applicationId and transactionId to the first item
 			if (!items?.[0]) {
 				throw new InternalServerErrorException('No items found in transformed benefit data');
 			}
 			items[0].applicationId = applicationId;
+			items[0].transactionId = transactionId;
 
 			return {
 				context: {
@@ -340,19 +348,104 @@ export class BenefitsService {
 					}
 				}
 			};
-			} catch (error) {
-				if (error.isAxiosError) {
-					// Handle AxiosError and rethrow as HttpException
-					throw new HttpException(
-						error.response?.data?.message ?? 'Benefit not found',
-						error.response?.status ?? HttpStatus.NOT_FOUND,
-					);
-				}
-
-				console.error('Error in init:', error);
-				throw new InternalServerErrorException('Failed to initialize benefit');
+		} catch (error) {
+			if (error.isAxiosError) {
+				// Handle AxiosError and rethrow as HttpException
+				throw new HttpException(
+					error.response?.data?.message ?? 'Benefit not found',
+					error.response?.status ?? HttpStatus.NOT_FOUND,
+				);
 			}
+
+			console.error('Error in init:', error);
+			throw new InternalServerErrorException('Failed to initialize benefit');
 		}
+	}
+
+	/**
+	 * DSEP Update endpoint: always updates an existing application by orderId and transactionId
+	 */
+	async update(data: any): Promise<any> {
+		// Validate BAP ID and URI
+		this.checkBapIdAndUri(
+			data?.context?.bap_id,
+			data?.context?.bap_uri,
+		);
+
+		// Extract transaction_id from context
+		const transactionId = data?.context?.transaction_id;
+		if (!transactionId) {
+			throw new BadRequestException('transaction_id is required in context');
+		}
+
+		// Extract applicationId (id) and applicationData
+		const applicationId = data?.message?.order?.fulfillments?.[0]?.customer?.applicationData?.orderId ?? null;
+		if (!applicationId) throw new BadRequestException('orderId (applicationId) is required for update');
+		const applicationData = data?.message?.order?.fulfillments?.[0]?.customer?.applicationData ?? {};
+		if (!applicationData || Object.keys(applicationData).length === 0) {
+			throw new BadRequestException('applicationData is required for update');
+		}
+
+		// Get benefitId from items[0].id
+		const item = data?.message?.order?.items?.[0];
+		if (!item?.id) {
+			throw new BadRequestException('message.order.items[0].id is required');
+		}
+		const benefitId = item.id;
+
+		// Validate benefit exists before updating application
+		const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+		if (!benefitData?.data) {
+			throw new BadRequestException(`Benefit ${benefitId} not found`);
+		}
+
+		// Add benefitId and transactionId to applicationData for update
+		const applicationDataWithContext = {
+			...applicationData,
+			benefitId: benefitId,
+			transactionId: transactionId,
+		};
+
+		// Update the application using applicationId (id) (and transactionId will be matched internally)
+		await this.applicationsService.updateApplication(applicationId, applicationDataWithContext);
+
+		let mappedResponse;
+		if (benefitData?.data) {
+			mappedResponse = await this.transformScholarshipsToOnestFormat(
+				data,
+				[benefitData?.data?.data],
+				'on_update',
+			);
+		}
+
+		const { id, descriptor, categories, locations, items, rateable }: any =
+			mappedResponse?.message.catalog.providers?.[0] ?? {};
+
+		if (!items || !id) {
+			throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
+		}
+
+		// Add real applicationId and transactionId to the first item
+		if (!items?.[0]) {
+			throw new InternalServerErrorException('No items found in transformed benefit data');
+		}
+		items[0].applicationId = applicationId;
+		items[0].transactionId = transactionId;
+
+		// Return context and message - responses[0] will come from network layer
+		return {
+			context: {
+				...data.context,
+				...mappedResponse?.context,
+			},
+			message: {
+				order: {
+					providers: [{ id, descriptor, rateable, locations, categories }],
+					items
+				}
+			}
+		};
+	}
 
 	async confirm(confirmDto: ConfirmRequestDto): Promise<any> {
 		this.checkBapIdAndUri(
@@ -372,14 +465,14 @@ export class BenefitsService {
 			}
 			const benefitData = await this.getBenefitsByIdStrapi(benefit.benefitId); // from strapi
 
-      let mappedResponse;
-      if (benefitData?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          confirmDto,
-          [benefitData?.data?.data],
-          'on_confirm',
-        );
-      }
+			let mappedResponse;
+			if (benefitData?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					confirmDto,
+					[benefitData?.data?.data],
+					'on_confirm',
+				);
+			}
 
 			// Generate order ID
 			const orderId: string =
@@ -438,6 +531,7 @@ export class BenefitsService {
 			console.log("BPP status API:", statusDto);
 			// Extract order ID from the request body
 			const orderId = statusDto?.message?.order_id;
+			console.log('Status check for orderId:', orderId);
 
 			// Fetch application details using the order ID
 			const applicationData = await this.applicationsService.find({
@@ -498,92 +592,92 @@ export class BenefitsService {
 				};
 			}
 
-      // Prepare the status object
-      const metadata = {
-        billing: {
-          name: 'N/A',
-          phone: 'N/A',
-          email: 'dummyemail@dummydomain.com',
-          address: 'N/A',
-          organization: {
-            "descriptor": {
-              "name": "Onest",
-              "code": "onest.com"
-            },
-            "contact": {
-              "phone": "+91-8888888888",
-              "email": "scholarships@nammayatri.in"
-            }
-          },
-        },
-        payments: [
-          {
-            params: {
-              bank_code: 'ICICI',
-              bank_account_number: '123456789012',
-              bank_account_name: 'John Doe',
-            },
-            type: 'PRE-ORDER',
-            status: 'PAID',
-            collected_by: 'bpp',
-          },
-        ],
-        fulfillments: [{
-          id: 'FULFILL_UNIFIED',
-          type: 'APPLICATION',
-          tracking: false,
-          state: {
-            descriptor: {
-              ...statusCode
-            },
-            updated_at: new Date().toISOString(),
-          },
-          agent: {
-            "person": {
-              "name": "Ekstep Foundation SPoc"
-            },
-            "contact": {
-              "email": "ekstepsupport@ekstep.com"
-            },
-          },
-          customer: {
-            "id": "aadhaar:798677675565",
-            "person": {
-              "name": "Jane Doe",
-              "age": "13",
-              "gender": "female"
-            },
-            "contact": {
-              "phone": "+91-9663088848",
-              "email": "jane.doe@example.com"
-            }
-          }
-        }],
-        quote: {
-          price: {
-            currency: 'INR',
-            value: '123',
-          },
-          breakup: [
-            {
-              title: 'Tuition Fee',
-              price: {
-                currency: 'INR',
-                value: '123',
-              },
-            }
-          ]
-        },
-      };
-      let mappedResponse;
-      if (benefitData?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          statusDto,
-          [benefitData?.data?.data],
-          'on_status',
-        );
+			// Prepare the status object
+			const metadata = {
+				billing: {
+					name: 'N/A',
+					phone: 'N/A',
+					email: 'dummyemail@dummydomain.com',
+					address: 'N/A',
+					organization: {
+						"descriptor": {
+							"name": "Onest",
+							"code": "onest.com"
+						},
+						"contact": {
+							"phone": "+91-8888888888",
+							"email": "scholarships@nammayatri.in"
+						}
+					},
+				},
+				payments: [
+					{
+						params: {
+							bank_code: 'ICICI',
+							bank_account_number: '123456789012',
+							bank_account_name: 'John Doe',
+						},
+						type: 'PRE-ORDER',
+						status: 'PAID',
+						collected_by: 'bpp',
+					},
+				],
+				fulfillments: [{
+					id: 'FULFILL_UNIFIED',
+					type: 'APPLICATION',
+					tracking: false,
+					state: {
+						descriptor: {
+							...statusCode
+						},
+						updated_at: new Date().toISOString(),
+					},
+					agent: {
+						"person": {
+							"name": "Ekstep Foundation SPoc"
+						},
+						"contact": {
+							"email": "ekstepsupport@ekstep.com"
+						},
+					},
+					customer: {
+						"id": "aadhaar:798677675565",
+						"person": {
+							"name": "Jane Doe",
+							"age": "13",
+							"gender": "female"
+						},
+						"contact": {
+							"phone": "+91-9663088848",
+							"email": "jane.doe@example.com"
+						}
+					}
+				}],
+				quote: {
+					price: {
+						currency: 'INR',
+						value: '123',
+					},
+					breakup: [
+						{
+							title: 'Tuition Fee',
+							price: {
+								currency: 'INR',
+								value: '123',
+							},
+						}
+					]
+				},
+			};
+			let mappedResponse;
+			if (benefitData?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					statusDto,
+					[benefitData?.data?.data],
+					'on_status',
+				);
 
-      }
+			}
 
 			const { id, descriptor, items, rateable }: any = mappedResponse?.message
 				.catalog.providers?.[0] ?? {
@@ -633,10 +727,10 @@ export class BenefitsService {
 		this.bapUri = bapUri;
 	}
 
-  async transformScholarshipsToOnestFormat(reqData, apiResponseArray: any[], action?) {
-    if (!Array.isArray(apiResponseArray)) {
-      throw new Error('Expected an array of benefits');
-    }
+	async transformScholarshipsToOnestFormat(reqData, apiResponseArray: any[], action?) {
+		if (!Array.isArray(apiResponseArray)) {
+			throw new Error('Expected an array of benefits');
+		}
 
 		const items = await Promise.all(
 			apiResponseArray.map(async (benefit) => {
@@ -670,105 +764,105 @@ export class BenefitsService {
 					this.formatApplicationForm(applicationForm),
 				]);
 
-        return {
-          id: documentId,
-          descriptor: {
-            name: title,
-            long_desc: longDescription,
-          },
-          price: {
-            currency: 'INR',
-            value: await this.calculateTotalBenefitValue(benefits), // await here!
-          },
-          time: {
-            range: {
-              start: new Date(applicationOpenDate).toISOString(),
-              end: new Date(applicationCloseDate).toISOString(),
-            },
-          },
-          rateable: false,
-          tags: [
-            eligibilityTags,
-            documentTags,
-            benefitTags,
-            exclusionTags,
-            sponsoringEntitiesTags,
-            applicationFormTags,
-          ]
-            .filter(Boolean)
-            .flat() as TagDto[],
-        };
-      }),
-    );
+				return {
+					id: documentId,
+					descriptor: {
+						name: title,
+						long_desc: longDescription,
+					},
+					price: {
+						currency: 'INR',
+						value: await this.calculateTotalBenefitValue(benefits), // await here!
+					},
+					time: {
+						range: {
+							start: new Date(applicationOpenDate).toISOString(),
+							end: new Date(applicationCloseDate).toISOString(),
+						},
+					},
+					rateable: false,
+					tags: [
+						eligibilityTags,
+						documentTags,
+						benefitTags,
+						exclusionTags,
+						sponsoringEntitiesTags,
+						applicationFormTags,
+					]
+						.filter(Boolean)
+						.flat() as TagDto[],
+				};
+			}),
+		);
 
 		const firstScholarship = apiResponseArray[0];
 
-    return {
-      context: {
-        version: '1.1.0',
-        ttl: 'PT10M',
-        ...reqData.context,
-        domain: this.domain,
-        action: action,
-        transaction_id: uuidv4(),
-        message_id: uuidv4(),
-        timestamp: new Date().toISOString(),
-        bap_id: this.bapId,
-        bap_uri: this.bapUri,
-        bpp_id: this.bppId,
-        bpp_uri: this.bppUri,
-      },
-      message: {
-        catalog: {
-          descriptor: {
-            name: this.bppId,
-          },
-          providers: [
-            {
-              id: this.bppId,
-              descriptor: {
-                name:
-                  firstScholarship?.providingEntity?.name ?? 'Unknown Provider',
-                short_desc: 'Multiple scholarships offered',
-                images: firstScholarship?.imageUrl
-                  ? [firstScholarship.imageUrl]
-                  : [],
-              },
-              categories: [
-                {
-                  id: 'CAT_SCHOLARSHIP',
-                  descriptor: {
-                    code: 'scholarship',
-                    name: 'Scholarship',
-                  },
-                },
-              ],
-              fulfillments: [
-                {
-                  id: 'FULFILL_UNIFIED',
-                  tracking: false,
-                },
-              ],
-              locations: [
-                {
-                  id: 'L1',
-                  city: {
-                    name: 'Pune',
-                    code: 'std:020',
-                  },
-                  state: {
-                    name: 'Maharashtra',
-                    code: 'MH',
-                  },
-                },
-              ],
-              items,
-            },
-          ],
-        },
-      },
-    };
-  }
+		return {
+			context: {
+				version: '1.1.0',
+				ttl: 'PT10M',
+				...reqData.context,
+				domain: this.domain,
+				action: action,
+				transaction_id: uuidv4(),
+				message_id: uuidv4(),
+				timestamp: new Date().toISOString(),
+				bap_id: this.bapId,
+				bap_uri: this.bapUri,
+				bpp_id: this.bppId,
+				bpp_uri: this.bppUri,
+			},
+			message: {
+				catalog: {
+					descriptor: {
+						name: this.bppId,
+					},
+					providers: [
+						{
+							id: this.bppId,
+							descriptor: {
+								name:
+									firstScholarship?.providingEntity?.name ?? 'Unknown Provider',
+								short_desc: 'Multiple scholarships offered',
+								images: firstScholarship?.imageUrl
+									? [firstScholarship.imageUrl]
+									: [],
+							},
+							categories: [
+								{
+									id: 'CAT_SCHOLARSHIP',
+									descriptor: {
+										code: 'scholarship',
+										name: 'Scholarship',
+									},
+								},
+							],
+							fulfillments: [
+								{
+									id: 'FULFILL_UNIFIED',
+									tracking: false,
+								},
+							],
+							locations: [
+								{
+									id: 'L1',
+									city: {
+										name: 'Pune',
+										code: 'std:020',
+									},
+									state: {
+										name: 'Maharashtra',
+										code: 'MH',
+									},
+								},
+							],
+							items,
+						},
+					],
+				},
+			},
+		};
+	}
 
 	// Calculate a rough total of monetary benefits if known
 	async calculateTotalBenefitValue(benefits) {
@@ -793,7 +887,7 @@ export class BenefitsService {
 				code: 'eligibility',
 				name: 'Eligibility',
 			},
-			list:eligibility.map( (e) =>({
+			list: eligibility.map((e) => ({
 				descriptor: {
 					code: e.evidence,
 					name:
@@ -818,7 +912,7 @@ export class BenefitsService {
 				code: 'required-docs',
 				name: 'Required Documents',
 			},
-			list: documents.map( (doc) => ({
+			list: documents.map((doc) => ({
 				descriptor: {
 					code: doc.isRequired ? 'mandatory-doc' : 'optional-doc',
 					name: doc.isRequired ? 'Mandatory Document' : 'Optional Document',
@@ -838,12 +932,12 @@ export class BenefitsService {
 				code: 'benefits',
 				name: 'Benefits',
 			},
-			list: benefits.map( (b) => ({
+			list: benefits.map((b) => ({
 				descriptor: {
 					code: 'financial',
 					name: b.title,
 				},
-				value: JSON.stringify(unsetObjectKeys(b, ['id','__component'])),	
+				value: JSON.stringify(unsetObjectKeys(b, ['id', '__component'])),
 				display: true,
 			})),
 		};
@@ -858,7 +952,7 @@ export class BenefitsService {
 				code: 'exclusions',
 				name: 'Exclusions',
 			},
-			list: exclusions.map( (e) => ({
+			list: exclusions.map((e) => ({
 				descriptor: {
 					code: 'ineligibility',
 					name: 'Ineligibility Condition',
@@ -878,7 +972,7 @@ export class BenefitsService {
 				code: 'sponsoringEntities',
 				name: 'Sponsoring Entities',
 			},
-			list: sponsoringEntities.map( (sponsoringEntity) => ({
+			list: sponsoringEntities.map((sponsoringEntity) => ({
 				descriptor: {
 					code: 'sponsoringEntities',
 					name: 'Entities Sponsoring Benefits',
@@ -894,7 +988,7 @@ export class BenefitsService {
 
 		// Flatten all fields from all field groups
 		const allFields: any[] = [];
-		
+
 		applicationForm.forEach((fieldGroup: any) => {
 			if (fieldGroup.fields && Array.isArray(fieldGroup.fields)) {
 				fieldGroup.fields.forEach((field: any) => {
@@ -915,7 +1009,7 @@ export class BenefitsService {
 				code: 'applicationForm',
 				name: 'Application Form',
 			},
-			list: allFields.map( (field) => ({
+			list: allFields.map((field) => ({
 				descriptor: {
 					code: 'applicationFormField-' + field.name,
 					name: 'Application Form Field - ' + field.label,

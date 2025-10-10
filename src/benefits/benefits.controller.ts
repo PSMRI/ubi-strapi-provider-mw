@@ -87,6 +87,15 @@ export class BenefitsController {
     return this.benefitsService.init(initRequestDto);
   }
 
+  @Post('dsep/update')
+  @ApiOperation({
+    summary: 'Update',
+    description: 'Always updates an existing application by orderId.'
+  })
+  async update(@Body() data: any) {
+    return this.benefitsService.update(data);
+  }
+
   @Post('dsep/confirm')
   @ApiOperation({
     summary: 'Confirm',
