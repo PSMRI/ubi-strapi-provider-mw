@@ -28,6 +28,7 @@ model Applications {
   eligibilityCheckedAt       DateTime?
   eligibilityResult          Json?
   eligibilityStatus          String?            @default("pending")
+  transactionId              String?
   applicationFiles           ApplicationFiles[] @relation("ApplicationsToApplicationFiles")
 }
 
