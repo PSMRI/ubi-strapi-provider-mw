@@ -165,6 +165,13 @@ export class ApplicationsService {
 				actionLog: Array.isArray(existing.actionLog)
 					? [...existing.actionLog, actionLogEntry]
 					: [actionLogEntry],
+				// Reset calculation and eligibility data for resubmission
+				calculatedAmount: Prisma.DbNull,
+				calculationsProcessedAt: null,
+				eligibilityCheckedAt: null,
+				eligibilityResult: Prisma.DbNull,
+				eligibilityStatus: 'pending',
+				documentVerificationStatus: null,
 			},
 		});
 		
@@ -178,7 +185,7 @@ export class ApplicationsService {
 		return {
 			application: updatedApplication,
 			applicationFiles,
-			message: 'Application updated.',
+			message: 'Application updated with resubmitted data.',
 		};
 	}
 
