@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Patch, UseFilters, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { ApplicationFilesService } from './applicationFiles.service';
 import { CreateApplicationFilesDto } from './dto/create-applicationfiles.dto';
@@ -9,6 +9,7 @@ import { AuthGuard } from 'src/auth/auth.guard';
 import { ApplicationFilesApiDocs } from '../docs';
 
 @UseFilters(new AllExceptionsFilter())
+@ApiBearerAuth('access-token')
 @ApiTags('ApplicationFiles')
 @Controller('application-files')
 export class ApplicationFilesController {
@@ -17,6 +18,7 @@ export class ApplicationFilesController {
   // Create a new ApplicationFile
   @Post()
   @UseGuards(AuthGuard)
+  @ApiExcludeEndpoint()
   @ApiOperation(ApplicationFilesApiDocs.create.operation)
   @ApiBody(ApplicationFilesApiDocs.create.body)
   @ApiResponse(ApplicationFilesApiDocs.create.responses.success)
@@ -32,6 +34,7 @@ export class ApplicationFilesController {
   // Get all ApplicationFiles
   @Get()
   @UseGuards(AuthGuard)
+  @ApiExcludeEndpoint()
   @ApiOperation(ApplicationFilesApiDocs.findAll.operation)
   @ApiResponse(ApplicationFilesApiDocs.findAll.responses.success)
   async findAll() {
@@ -41,6 +44,7 @@ export class ApplicationFilesController {
   // Get a single ApplicationFile by ID
   @Get(':id')
   @UseGuards(AuthGuard)
+  @ApiExcludeEndpoint()
   @ApiOperation(ApplicationFilesApiDocs.findOne.operation)
   @ApiParam(ApplicationFilesApiDocs.findOne.param)
   @ApiResponse(ApplicationFilesApiDocs.findOne.responses.success)
@@ -52,6 +56,7 @@ export class ApplicationFilesController {
   // Update an ApplicationFile by ID
   @Patch(':id')
   @UseGuards(AuthGuard)
+  @ApiExcludeEndpoint()
   @ApiOperation(ApplicationFilesApiDocs.update.operation)
   @ApiParam(ApplicationFilesApiDocs.update.param)
   @ApiBody(ApplicationFilesApiDocs.update.body)

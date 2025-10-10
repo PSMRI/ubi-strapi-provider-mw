@@ -13,10 +13,11 @@ import { HttpService } from '@nestjs/axios';
 import { SearchRequestDto } from './dto/search-request.dto';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-import { generateRandomString, getAuthToken, titleCase } from 'src/common/util';
+import { generateRandomString, getAuthToken, titleCase, unsetObjectKeys } from 'src/common/util';
 import { PrismaService } from '../prisma.service';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { InitRequestDto } from './dto/init-request.dto';
+import { InitResponseDto } from './dto/init-response.dto';
 import { ConfirmRequestDto } from './dto/confirm-request.dto';
 import { SearchBenefitsDto } from './dto/search-benefits.dto';
 import { ConfirmResponseDto } from './dto/confirm-response.dto';
@@ -248,7 +249,8 @@ export class BenefitsService {
         );
       }
 
-			return mappedResponse;
+	  return mappedResponse;
+
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
@@ -263,77 +265,94 @@ export class BenefitsService {
 		}
 	}
 
-	async init(selectDto: InitRequestDto): Promise<any> {
-		this.checkBapIdAndUri(
-			selectDto?.context?.bap_id,
-			selectDto?.context?.bap_uri,
-		);
-		try {
-			const benefitId = selectDto.message.order.items[0].id;
+		async init(initRequestDto: InitRequestDto): Promise<InitResponseDto> {
+			// Validate BAP ID and URI
+			this.checkBapIdAndUri(
+				initRequestDto?.context?.bap_id,
+				initRequestDto?.context?.bap_uri,
+			);
 
-			// Fetch benefit data from the Strapi API
+			try {
+			// Extract applicationData from the payload
+			const applicationData = initRequestDto?.message?.order?.fulfillments?.[0]?.customer?.applicationData;
+
+				if (applicationData) {
+					// Application data extracted successfully
+				} else {
+					console.log('No applicationData found in payload');
+					throw new BadRequestException('ApplicationData is required in payload');
+				}
+
+			const item = initRequestDto?.message?.order?.items?.[0];
+			if (!item?.id) {
+				throw new BadRequestException('message.order.items[0].id is required');
+			}
+			const benefitId = item.id;
+
+			// Validate benefit exists before creating application
 			const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+			if (!benefitData?.data) {
+				throw new BadRequestException(`Benefit ${benefitId} not found`);
+			}
 
-			let mappedResponse;
-
-      if (benefitData?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          selectDto,
-          [benefitData?.data?.data],
-          'on_init',
-        );
-      }
-
-			const xinput = {
-				head: {
-					descriptor: {
-						name: 'Application Form',
-					},
-					index: {
-						min: 0,
-						cur: 0,
-						max: 1,
-					},
-					headings: ['Personal Details'],
-				},
-				form: {
-					url: `${this.providerUrl}/benefit/apply/${benefitId}`, // React route for the benefit ID
-					mime_type: 'text/html',
-					resubmit: false,
-				},
-				required: true,
+			// Add benefitId to applicationData for application creation
+			const applicationDataWithContext = {
+				...applicationData,
+				benefitId: benefitId,
 			};
+
+			// Create the application and get the real applicationId
+			const createdApplication = await this.applicationsService.create(applicationDataWithContext);
+			const applicationId = createdApplication.application.id;
+
+				let mappedResponse;
+
+				if (benefitData?.data) {
+					mappedResponse = await this.transformScholarshipsToOnestFormat(
+						initRequestDto,
+						[benefitData?.data?.data],
+						'on_init',
+					);
+				}
 
 			const { id, descriptor, categories, locations, items, rateable }: any =
 				mappedResponse?.message.catalog.providers?.[0] ?? {};
 
-			items[0].xinput = xinput;
-
-			selectDto.message.order = {
-				...selectDto.message.order,
-				// Ensure the object matches the InitOrderDto type
-				providers: [{ id, descriptor, rateable, locations, categories }],
-				items,
-			};
-
-			selectDto.context = {
-				...selectDto.context,
-				...mappedResponse?.context,
-			};
-			return selectDto;
-		} catch (error) {
-			if (error.isAxiosError) {
-				// Handle AxiosError and rethrow as HttpException
-				throw new HttpException(
-					error.response?.data?.message ?? 'Benefit not found',
-					error.response?.status ?? HttpStatus.NOT_FOUND,
-				);
+			if (!items || !id) {
+				throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
 			}
 
-			console.error('Error in handleInit:', error);
-			throw new InternalServerErrorException('Failed to initialize benefit');
+			// Add real applicationId to the first item
+			if (!items?.[0]) {
+				throw new InternalServerErrorException('No items found in transformed benefit data');
+			}
+			items[0].applicationId = applicationId;
+
+			return {
+				context: {
+					...initRequestDto.context,
+					...mappedResponse?.context,
+				},
+				message: {
+					order: {
+						providers: [{ id, descriptor, rateable, locations, categories }],
+						items
+					}
+				}
+			};
+			} catch (error) {
+				if (error.isAxiosError) {
+					// Handle AxiosError and rethrow as HttpException
+					throw new HttpException(
+						error.response?.data?.message ?? 'Benefit not found',
+						error.response?.status ?? HttpStatus.NOT_FOUND,
+					);
+				}
+
+				console.error('Error in init:', error);
+				throw new InternalServerErrorException('Failed to initialize benefit');
+			}
 		}
-	}
 
 	async confirm(confirmDto: ConfirmRequestDto): Promise<any> {
 		this.checkBapIdAndUri(
@@ -702,11 +721,11 @@ export class BenefitsService {
       message: {
         catalog: {
           descriptor: {
-            name: 'Protean DSEP Scholarships and Grants BPP Platform',
+            name: this.bppId,
           },
           providers: [
             {
-              id: 'PROVIDER_UNIFIED',
+              id: this.bppId,
               descriptor: {
                 name:
                   firstScholarship?.providingEntity?.name ?? 'Unknown Provider',
@@ -774,7 +793,7 @@ export class BenefitsService {
 				code: 'eligibility',
 				name: 'Eligibility',
 			},
-			list: eligibility.map((e) => ({
+			list:eligibility.map( (e) =>({
 				descriptor: {
 					code: e.evidence,
 					name:
@@ -784,7 +803,7 @@ export class BenefitsService {
 						e.evidence,
 					short_desc: e.description,
 				},
-				value: JSON.stringify(e),
+				value: JSON.stringify(unsetObjectKeys(e, ['id'])),
 				display: true,
 			})),
 		};
@@ -799,12 +818,12 @@ export class BenefitsService {
 				code: 'required-docs',
 				name: 'Required Documents',
 			},
-			list: documents.map((doc) => ({
+			list: documents.map( (doc) => ({
 				descriptor: {
 					code: doc.isRequired ? 'mandatory-doc' : 'optional-doc',
 					name: doc.isRequired ? 'Mandatory Document' : 'Optional Document',
 				},
-				value: JSON.stringify(doc),
+				value: JSON.stringify(unsetObjectKeys(doc, ['id'])),
 				display: true,
 			})),
 		};
@@ -819,12 +838,12 @@ export class BenefitsService {
 				code: 'benefits',
 				name: 'Benefits',
 			},
-			list: benefits.map((b) => ({
+			list: benefits.map( (b) => ({
 				descriptor: {
 					code: 'financial',
 					name: b.title,
 				},
-				value: JSON.stringify(b),
+				value: JSON.stringify(unsetObjectKeys(b, ['id','__component'])),	
 				display: true,
 			})),
 		};
@@ -839,12 +858,12 @@ export class BenefitsService {
 				code: 'exclusions',
 				name: 'Exclusions',
 			},
-			list: exclusions.map((e) => ({
+			list: exclusions.map( (e) => ({
 				descriptor: {
 					code: 'ineligibility',
 					name: 'Ineligibility Condition',
 				},
-				value: JSON.stringify(e),
+				value: JSON.stringify(unsetObjectKeys(e, ['id'])),
 				display: true,
 			})),
 		};
@@ -859,12 +878,12 @@ export class BenefitsService {
 				code: 'sponsoringEntities',
 				name: 'Sponsoring Entities',
 			},
-			list: sponsoringEntities.map((sponsoringEntity) => ({
+			list: sponsoringEntities.map( (sponsoringEntity) => ({
 				descriptor: {
 					code: 'sponsoringEntities',
 					name: 'Entities Sponsoring Benefits',
 				},
-				value: JSON.stringify(sponsoringEntity),
+				value: JSON.stringify(unsetObjectKeys(sponsoringEntity, ['id'])),
 				display: true,
 			})),
 		};
@@ -896,12 +915,12 @@ export class BenefitsService {
 				code: 'applicationForm',
 				name: 'Application Form',
 			},
-			list: allFields.map((field) => ({
+			list: allFields.map( (field) => ({
 				descriptor: {
 					code: 'applicationFormField-' + field.name,
 					name: 'Application Form Field - ' + field.label,
 				},
-				value: JSON.stringify(field),
+				value: JSON.stringify(unsetObjectKeys(field, ['id'])),
 				display: true,
 			})),
 		};

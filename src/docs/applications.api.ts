@@ -8,17 +8,21 @@ export const ApplicationsApiDocs = {
       description: 'Application data',
       schema: {
         example: {
-          benefitId: 'BENEFIT123',
-          status: 'Pending',
-          applicationData: {
-            applicantName: 'John Doe',
-            age: 25,
-            income: 50000
-          },
-          customerId: 'CUST123',
-          bapId: 'BAP456',
-          calculatedAmount: '1000.00',
-          finalAmount: '1200.00'
+          benefitId: "BENEFIT123",
+          firstName: "John",
+          lastName: "Doe",
+          age: 25,
+          gender: "male",
+          vc_documents: [
+            {
+              document_submission_reason: ["gender"],
+              document_type: "idProof",
+              document_subtype: "otrCertificate",
+              document_format: "json",
+              document_imported_from: "QR Code",
+              document_content: "base64,ewogICJpZCI6IDEyMywKICAibmFtZSI6ICJKb2huIERvZSIsCiAgImVtYWlsIjogImpvaG5AZXhhbXBsZS5jb20iLAogICJhY3RpdmUiOiB0cnVlCn0="
+            }
+          ]
         }
       }
     },

@@ -1,4 +1,4 @@
-name: Deploy to UBA-DEV
+name: Deploy to UBA-PILOT
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       TAG:
         description: 'Docker image tag to deploy'
         required: true
-        default: 'latest'
+        default: 'v0.0.0'
       BRANCH:
         description: 'Git branch to deploy'
         required: true
@@ -16,22 +16,22 @@ on:
       - '*'  # Trigger on any tag push
 
 jobs:
-  Deploy_on_UBA_DEV:
+  Deploy_on_UBA_PILOT:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: UBA-DEV
+    environment: UBA-DEPWD-PILOT
 
     steps:
       - name: Deploy Strapi MW via SSH
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST_NAME }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST_NAME_PILOT }}
+          username: ${{ secrets.USERNAME_PILOT }}
+          key: ${{ secrets.EC2_SSH_KEY_PILOT }}
+          port: ${{ secrets.PORT_PILOT }}
           script: |
             # ----- Set environment variables -----
-            export BASE_DIR="${{ secrets.TARGET_DIR }}"
+            export BASE_DIR="${{ secrets.TARGET_DIR_PILOT }}"
             export REPO_NAME="ubi-strapi-provider-mw"
             export REPO_URL="https://github.com/PSMRI/ubi-strapi-provider-mw.git"
             export BRANCH="${{ github.event.inputs.BRANCH || 'main' }}"
@@ -42,7 +42,7 @@ jobs:
 
             # ----- Prepare .env -----
             if [ -f .env ]; then rm .env; fi
-            echo '${{ secrets.DEV_ENV }}' > .env
+            echo '${{ secrets.ENV_PILOT }}' > .env
 
             # ----- Run deploy script -----
             bash deploy.sh
