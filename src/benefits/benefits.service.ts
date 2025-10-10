@@ -443,7 +443,7 @@ export class BenefitsService {
 			const applicationData = await this.applicationsService.find({
 				orderId,
 			});
-
+			console.log("BPP status API applicationData:", applicationData);
 			if (!applicationData || applicationData.length === 0) {
 				throw new BadRequestException(
 					'No application found for the given order ID',
@@ -607,7 +607,7 @@ export class BenefitsService {
 				...statusDto.context,
 				...mappedResponse?.context,
 			};
-
+			console.log("BPP status API statusData:", statusData);
 			return statusData;
 		} catch (error) {
 			if (error.isAxiosError) {
