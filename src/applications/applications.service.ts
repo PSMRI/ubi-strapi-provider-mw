@@ -138,8 +138,14 @@ export class ApplicationsService {
 		// Extract transactionId from data
 		const transactionId = data.transactionId ?? null;
 
+		// Validate applicationId is a valid integer
+		const parsedId = parseInt(applicationId, 10);
+		if (isNaN(parsedId) || parsedId <= 0) {
+			throw new BadRequestException(`Invalid applicationId: ${applicationId}`);
+		}
+
 		// Step 2: Find existing application by id and optionally transactionId
-		let whereClause: any = { id: parseInt(applicationId) };
+		let whereClause: any = { id: parsedId };
 		if (transactionId) {
 			whereClause.transactionId = transactionId;
 		}
