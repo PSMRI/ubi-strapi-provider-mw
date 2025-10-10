@@ -154,8 +154,8 @@ export class ApplicationsService {
 			where: { applicationId: existing.id },
 		});
 
-		// Step 5: Update application record in database
-		await this.prisma.applications.update({
+		// Step 5: Update application record in database and capture the result
+		const updatedApplication = await this.prisma.applications.update({
 			where: { id: existing.id },
 			data: {
 				applicationData: JSON.stringify(applicationFields),
@@ -176,7 +176,7 @@ export class ApplicationsService {
 		
 		// Step 7: Return updated application with files
 		return {
-			application: { ...existing, ...applicationFields },
+			application: updatedApplication,
 			applicationFiles,
 			message: 'Application updated.',
 		};
