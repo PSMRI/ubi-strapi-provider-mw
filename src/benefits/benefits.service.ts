@@ -73,7 +73,7 @@ export class BenefitsService {
 	async getBenefits(body: SearchBenefitsDto, req: Request): Promise<any> {
 		const authToken = getAuthToken(req);
 		const page = body?.page ?? '1';
-		const pageSize = body?.pageSize ?? '100';
+		const pageSize = body?.pageSize ?? '1000';
 		const sort = body?.sort ?? 'createdAt:desc';
 		const locale = body?.locale ?? 'en';
 		const filters = body?.filters ?? {};
@@ -528,7 +528,7 @@ export class BenefitsService {
 		);
 		try {
 			const statusData = new StatusResponseDto();
-
+			console.log("BPP status API:", statusDto);
 			// Extract order ID from the request body
 			const orderId = statusDto?.message?.order_id;
 			console.log('Status check for orderId:', orderId);
@@ -537,7 +537,7 @@ export class BenefitsService {
 			const applicationData = await this.applicationsService.find({
 				orderId,
 			});
-
+			console.log("BPP status API applicationData:", applicationData);
 			if (!applicationData || applicationData.length === 0) {
 				throw new BadRequestException(
 					'No application found for the given order ID',
@@ -701,7 +701,7 @@ export class BenefitsService {
 				...statusDto.context,
 				...mappedResponse?.context,
 			};
-
+			console.log("BPP status API statusData:", statusData);
 			return statusData;
 		} catch (error) {
 			if (error.isAxiosError) {
