@@ -283,6 +283,9 @@ export class BenefitsService {
 				throw new BadRequestException('ApplicationData is required in payload');
 			}
 
+			// Extract bap_application_id from applicationData
+			const bapApplicationId = applicationData?.bap_application_id;
+
 			// Extract transaction_id from context
 			const transactionId = initRequestDto?.context?.transaction_id;
 			if (!transactionId) {
@@ -301,12 +304,24 @@ export class BenefitsService {
 				throw new BadRequestException(`Benefit ${benefitId} not found`);
 			}
 
-			// Add benefitId and transactionId to applicationData for application creation
+			// Extract bapId from context
+			const bapId = initRequestDto?.context?.bap_id;
+			if (!bapId) {
+				throw new BadRequestException('bap_id is required in context');
+			}
+
+			// Add benefitId, transactionId, bapId to applicationData for application creation
 			const applicationDataWithContext = {
 				...applicationData,
 				benefitId: benefitId,
 				transactionId: transactionId,
+				bapId: bapId,
 			};
+
+			// Only add bap_application_id if it exists
+			if (bapApplicationId) {
+				applicationDataWithContext.bap_application_id = bapApplicationId;
+			}
 
 			// Create the application and get the real applicationId
 			const createdApplication = await this.applicationsService.create(applicationDataWithContext);
@@ -386,6 +401,9 @@ export class BenefitsService {
 			throw new BadRequestException('applicationData is required for update');
 		}
 
+		// Extract bap_application_id from applicationData
+		const bapApplicationId = applicationData?.bap_application_id;
+
 		// Get benefitId from items[0].id
 		const item = data?.message?.order?.items?.[0];
 		if (!item?.id) {
@@ -399,12 +417,24 @@ export class BenefitsService {
 			throw new BadRequestException(`Benefit ${benefitId} not found`);
 		}
 
-		// Add benefitId and transactionId to applicationData for update
+		// Extract bapId from context
+		const bapId = data?.context?.bap_id;
+		if (!bapId) {
+			throw new BadRequestException('bap_id is required in context');
+		}
+
+		// Add benefitId, transactionId, bapId to applicationData for update
 		const applicationDataWithContext = {
 			...applicationData,
 			benefitId: benefitId,
 			transactionId: transactionId,
+			bapId: bapId,
 		};
+
+		// Only add bap_application_id if it exists
+		if (bapApplicationId) {
+			applicationDataWithContext.bap_application_id = bapApplicationId;
+		}
 
 		// Update the application using applicationId (id) (and transactionId will be matched internally)
 		await this.applicationsService.updateApplication(applicationId, applicationDataWithContext);

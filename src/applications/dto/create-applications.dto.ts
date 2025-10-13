@@ -96,6 +96,11 @@ export class CreateApplicationsDto {
   @IsString()
   bapId?: string;
 
+  @ApiPropertyOptional({ description: 'BAP Application ID', example: 'BAP_APP_123' })
+  @IsOptional()
+  @IsString()
+  bapApplicationId?: string;
+
   @ApiPropertyOptional({ description: 'Order ID', example: 'TXPLS2345' })
   @IsOptional()
   @IsString()
