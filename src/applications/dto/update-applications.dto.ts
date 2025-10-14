@@ -36,6 +36,11 @@ export class UpdateApplicationsDto {
   @IsString()
   bapId?: string;
 
+  @ApiPropertyOptional({ description: 'BAP Application ID', example: 'BAP_APP_123' })
+  @IsOptional()
+  @IsString()
+  bapApplicationId?: string;
+
   @ApiPropertyOptional({ description: 'Calculated Amount', example: '1000.00' })
   @IsOptional()
   @IsString()

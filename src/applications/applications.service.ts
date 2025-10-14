@@ -84,8 +84,41 @@ export class ApplicationsService {
 
 		// Step 2: Extract and prepare application metadata
 		const bapId = data.bapId ?? data.bapid ?? data.bapID ?? null;
+		const bapApplicationId = data.bap_application_id ?? data.bapApplicationId ?? null;
 		const orderId = data.orderId ?? null;
 		const customerId = uuidv4();
+
+		// Step 2.1: Check for duplicate entries and return existing application if found
+		// Use combination of bap_application_id, bap_id, benefit_id, and transaction_id for duplicate detection
+		// This prevents creating duplicate applications for the same request from BAP
+		if (transactionId && bapId && benefitId) {
+			const whereClause: any = {
+				transactionId,
+				bapId,
+				benefitId,
+			};
+
+			// Include bapApplicationId in duplicate check if it exists
+			// This ensures more precise duplicate detection when bap_application_id is provided
+			if (bapApplicationId) {
+				whereClause.bapApplicationId = bapApplicationId;
+			}
+
+			const existingApplication = await this.prisma.applications.findFirst({
+				where: whereClause,
+				include: {
+					applicationFiles: true,
+				},
+			});
+
+			if (existingApplication) {
+				return {
+					application: existingApplication,
+					applicationFiles: existingApplication.applicationFiles || [],
+					message: 'Existing application found based on bap_application_id, bap_id, benefit_id, transaction_id combination.',
+				};
+			}
+		}
 
 		// Step 3: Create action log entry for tracking
 		const actionLogEntry = this.getActionLogEntry(
@@ -107,6 +140,7 @@ export class ApplicationsService {
 				status: 'pending',
 				customerId,
 				bapId,
+				bapApplicationId,
 				applicationData: JSON.stringify(applicationFields),
 				orderId,
 				transactionId,
@@ -135,8 +169,10 @@ export class ApplicationsService {
 		// Step 1: Process and validate input data
 		const { vcDocuments, applicationFields } = this.processNewFormat(data);
 
-		// Extract transactionId from data
+		// Extract transactionId and bapApplicationId from data
 		const transactionId = data.transactionId ?? null;
+		const bapId = data.bapId ?? data.bapid ?? data.bapID ?? null;
+		const bapApplicationId = data.bap_application_id ?? data.bapApplicationId ?? null;
 
 		// Validate applicationId is a valid integer
 		const parsedId = parseInt(applicationId, 10);
@@ -173,38 +209,52 @@ export class ApplicationsService {
 			null,
 		);
 
-		// Step 4: Delete existing application files for clean resubmission
-		await this.prisma.applicationFiles.deleteMany({
-			where: { applicationId: existing.id },
-		});
+		// Step 4: Delete existing application files only if new vc_documents are provided
+		if (vcDocuments && vcDocuments.length > 0) {
+			await this.prisma.applicationFiles.deleteMany({
+				where: { applicationId: existing.id },
+			});
+		}
 
 		// Step 5: Update application record in database and capture the result
+		const updateData: any = {
+			applicationData: JSON.stringify(applicationFields),
+			status: 'pending',
+			updatedAt: new Date(),
+			remark: null,
+			transactionId,
+			bapId,
+			actionLog: Array.isArray(existing.actionLog)
+				? [...existing.actionLog, actionLogEntry]
+				: [actionLogEntry],
+			// Reset calculation and eligibility data for resubmission
+			calculatedAmount: Prisma.DbNull,
+			calculationsProcessedAt: null,
+			eligibilityCheckedAt: null,
+			eligibilityResult: Prisma.DbNull,
+			eligibilityStatus: 'pending',
+			documentVerificationStatus: null,
+		};
+
+		// Only update bapApplicationId if it's provided in the data
+		// This preserves the existing value if not provided
+		if (bapApplicationId !== null) {
+			updateData.bapApplicationId = bapApplicationId;
+		}
+
 		const updatedApplication = await this.prisma.applications.update({
 			where: { id: existing.id },
-			data: {
-				applicationData: JSON.stringify(applicationFields),
-				status: 'pending',
-				updatedAt: new Date(),
-				remark: null,
-				transactionId,
-				actionLog: Array.isArray(existing.actionLog)
-					? [...existing.actionLog, actionLogEntry]
-					: [actionLogEntry],
-				// Reset calculation and eligibility data for resubmission
-				calculatedAmount: Prisma.DbNull,
-				calculationsProcessedAt: null,
-				eligibilityCheckedAt: null,
-				eligibilityResult: Prisma.DbNull,
-				eligibilityStatus: 'pending',
-				documentVerificationStatus: null,
-			},
+			data: updateData,
 		});
 
-		// Step 6: Process and upload new application files
-		const applicationFiles = await this.processApplicationFiles(
-			existing.id,
-			vcDocuments,
-		);
+		// Step 6: Process and upload new application files only if provided
+		let applicationFiles: any[] = [];
+		if (vcDocuments && vcDocuments.length > 0) {
+			applicationFiles = await this.processApplicationFiles(
+				existing.id,
+				vcDocuments,
+			);
+		}
 
 		// Step 7: Return updated application with files
 		return {
@@ -235,7 +285,7 @@ export class ApplicationsService {
 		});
 
 		// Extract all other fields as application data (excluding control fields)
-		const excludeFields = ['vc_documents', 'benefitId', 'orderId', 'bapId', 'status', 'applicationData', 'customerId', 'transactionId'];
+		const excludeFields = ['vc_documents', 'benefitId', 'orderId', 'bapId', 'bap_application_id', 'bapApplicationId', 'status', 'applicationData', 'customerId', 'transactionId'];
 		for (const [key, value] of Object.entries(data)) {
 			if (!excludeFields.includes(key) && !key.startsWith('_') && value !== undefined) {
 				applicationFields[key] = value;
