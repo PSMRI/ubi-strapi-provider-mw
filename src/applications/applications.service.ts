@@ -285,7 +285,7 @@ export class ApplicationsService {
 		});
 
 		// Extract all other fields as application data (excluding control fields)
-		const excludeFields = ['vc_documents', 'benefitId', 'orderId', 'bapId', 'status', 'applicationData', 'customerId', 'transactionId'];
+		const excludeFields = ['vc_documents', 'benefitId', 'orderId', 'bapId', 'bap_application_id', 'bapApplicationId', 'status', 'applicationData', 'customerId', 'transactionId'];
 		for (const [key, value] of Object.entries(data)) {
 			if (!excludeFields.includes(key) && !key.startsWith('_') && value !== undefined) {
 				applicationFields[key] = value;
