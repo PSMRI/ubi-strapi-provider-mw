@@ -1,6 +1,6 @@
-import { IsNotEmpty, IsString, IsArray, ValidateNested } from 'class-validator';
+import { IsNotEmpty, IsString, IsArray, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BENEFIT_CONSTANTS } from '../benefit.constants';
 
 class DescriptorDto {
@@ -77,7 +77,7 @@ class TimeRangeDto {
 }
 
 class ItemDto {
-  @ApiProperty({ description: 'ID of the item', example: 'SCM_63587501' })
+  @ApiProperty({ description: 'ID of the item (benefit documentId)', example: 'psp2q73amab8spwtlx3hj26s' })
   @IsString()
   @IsNotEmpty()
   id: string;
@@ -92,25 +92,25 @@ class ItemDto {
   @Type(() => PriceDto)
   price: PriceDto;
 
-  @ApiProperty({ description: 'Time range of the item', type: TimeRangeDto })
+  @ApiProperty({ description: 'Time range of the item (application open/close dates)', type: Object })
   @ValidateNested()
   @Type(() => TimeRangeDto)
-  time: TimeRangeDto;
+  time: { range: TimeRangeDto };
 
   @ApiProperty({ description: 'Rateable flag', example: false })
   @IsNotEmpty()
   rateable: boolean;
 
-  @ApiProperty({ description: 'Tags associated with the item', type: [TagDto] })
+  @ApiPropertyOptional({ 
+    description: 'Tags associated with the item (excluded in status response for performance)', 
+    type: [TagDto],
+    required: false
+  })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TagDto)
-  tags: TagDto[];
-
-  @ApiProperty({ description: 'Fulfillment IDs', type: [String], example: ['VSP_FUL_1113'] })
-  @IsArray()
-  @IsNotEmpty()
-  fulfillment_ids: string[];
+  tags?: TagDto[];
 }
 
 class ProviderDto {
@@ -129,30 +129,6 @@ class ProviderDto {
   rateable: boolean;
 }
 
-class BillingDto {
-  @ApiProperty({ description: 'Name of the billing entity', example: 'Manjunath' })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty({ description: 'Organization details', type: Object })
-  @IsNotEmpty()
-  organization: {
-    descriptor: DescriptorDto;
-    contact: { phone: string; email: string };
-  };
-
-  @ApiProperty({ description: 'Billing address', example: 'No 27, XYZ Lane, etc' })
-  @IsString()
-  @IsNotEmpty()
-  address: string;
-
-  @ApiProperty({ description: 'Billing phone number', example: '+91-9999999999' })
-  @IsString()
-  @IsNotEmpty()
-  phone: string;
-}
-
 class FulfillmentStateDto {
   @ApiProperty({ description: 'Descriptor of the state', type: DescriptorDto })
   @ValidateNested()
@@ -166,17 +142,12 @@ class FulfillmentStateDto {
 }
 
 class FulfillmentDto {
-  @ApiProperty({ description: 'State of the fulfillment', type: FulfillmentStateDto })
-  @ValidateNested()
-  @Type(() => FulfillmentStateDto)
-  state: FulfillmentStateDto;
-
-  @ApiProperty({ description: 'Fulfillment ID', example: 'VSP_FUL_1113' })
+  @ApiProperty({ description: 'Fulfillment ID', example: 'FULFILL_UNIFIED' })
   @IsString()
   @IsNotEmpty()
   id: string;
 
-  @ApiProperty({ description: 'Fulfillment type', example: 'SCHOLARSHIP' })
+  @ApiProperty({ description: 'Fulfillment type', example: 'APPLICATION' })
   @IsString()
   @IsNotEmpty()
   type: string;
@@ -185,72 +156,28 @@ class FulfillmentDto {
   @IsNotEmpty()
   tracking: boolean;
 
-  @ApiProperty({ description: 'Agent details', type: Object })
-  @IsNotEmpty()
-  agent: {
-    person: { name: string };
-    contact: { email: string };
+  @ApiProperty({ description: 'State of the fulfillment with status information', type: FulfillmentStateDto })
+  @ValidateNested()
+  @Type(() => FulfillmentStateDto)
+  state: FulfillmentStateDto;
+}
+
+
+class LocationDto {
+  @ApiPropertyOptional({ description: 'Country information', type: Object })
+  @IsOptional()
+  country?: {
+    name: string;
+    code: string;
   };
 
-  @ApiProperty({ description: 'Customer details', type: Object })
-  @IsNotEmpty()
-  customer: {
-    id: string;
-    person: { name: string; age: string; gender: string };
-    contact: { phone: string; email: string };
+  @ApiPropertyOptional({ description: 'City information', type: Object })
+  @IsOptional()
+  city?: {
+    name: string;
+    code: string;
   };
 }
-
-class PaymentParamsDto {
-  @ApiProperty({ description: 'Bank code', example: 'IFSC_Code_Of_the_bank' })
-  @IsString()
-  @IsNotEmpty()
-  bank_code: string;
-
-  @ApiProperty({ description: 'Bank account number', example: '121212121212' })
-  @IsString()
-  @IsNotEmpty()
-  bank_account_number: string;
-
-  @ApiProperty({ description: 'Bank account name', example: 'Account Holder Name' })
-  @IsString()
-  @IsNotEmpty()
-  bank_account_name: string;
-}
-
-class PaymentDto {
-  @ApiProperty({ description: 'Payment parameters', type: PaymentParamsDto })
-  @ValidateNested()
-  @Type(() => PaymentParamsDto)
-  params: PaymentParamsDto;
-}
-
-class QuoteBreakupDto {
-  @ApiProperty({ description: 'Title of the breakup', example: 'Tution fee' })
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @ApiProperty({ description: 'Price details', type: PriceDto })
-  @ValidateNested()
-  @Type(() => PriceDto)
-  price: PriceDto;
-}
-
-class QuoteDto {
-  @ApiProperty({ description: 'Total price', type: PriceDto })
-  @ValidateNested()
-  @Type(() => PriceDto)
-  price: PriceDto;
-
-  @ApiProperty({ description: 'Breakup of the quote', type: [QuoteBreakupDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => QuoteBreakupDto)
-  breakup: QuoteBreakupDto[];
-}
-
-
 
 class ContextDto {
   @ApiProperty({ description: 'Domain of the request', example: BENEFIT_CONSTANTS.FINANCE })
@@ -278,44 +205,90 @@ class ContextDto {
   @IsNotEmpty()
   version: string;
 
-  @ApiProperty({ description: 'BAP ID', example: 'sample.bap.io' })
+  @ApiProperty({ description: 'BAP ID', example: 'dev-uba-bap.tekdinext.com' })
   @IsString()
   @IsNotEmpty()
   bap_id: string;
 
-  @ApiProperty({ description: 'BAP URI', example: 'https://sample.bap.io' })
+  @ApiProperty({ description: 'BAP URI', example: 'https://dev-uba-bap.tekdinext.com' })
   @IsString()
   @IsNotEmpty()
   bap_uri: string;
 
-  @ApiProperty({ description: 'BPP ID', example: 'sample.bpp.io' })
+  @ApiProperty({ description: 'BPP ID', example: 'dev-uba-bpp.tekdinext.com' })
   @IsString()
   @IsNotEmpty()
   bpp_id: string;
 
-  @ApiProperty({ description: 'BPP URI', example: 'https://sample.bpp.io' })
+  @ApiProperty({ description: 'BPP URI', example: 'https://dev-uba-bpp.tekdinext.com' })
   @IsString()
   @IsNotEmpty()
   bpp_uri: string;
 
-  @ApiProperty({ description: 'Transaction ID', example: 'a9aaecca-10b7-4d19-b640-b047a7c60008' })
+  @ApiProperty({ description: 'Transaction ID', example: 'ce1e6ce8-5aba-487f-83e6-95935124e35f' })
   @IsString()
   @IsNotEmpty()
   transaction_id: string;
 
-  @ApiProperty({ description: 'Message ID', example: 'f6a7d7ea-a23e-4419-b07e-a3412fdffecf' })
+  @ApiProperty({ description: 'Message ID', example: 'e9643853-be21-487e-9432-de07778fd24c' })
   @IsString()
   @IsNotEmpty()
   message_id: string;
+
+  @ApiPropertyOptional({ description: 'Location information', type: LocationDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationDto)
+  location?: LocationDto;
+}
+class OrderDto {
+  @ApiProperty({ description: 'Order ID from application', example: 'TLEXP_ZBQYCK_1747141815005' })
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+
+  @ApiProperty({ description: 'Provider details', type: ProviderDto })
+  @ValidateNested()
+  @Type(() => ProviderDto)
+  provider: ProviderDto;
+
+  @ApiProperty({ description: 'List of benefit items (tags excluded for performance)', type: [ItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItemDto)
+  items: ItemDto[];
+
+  @ApiProperty({ 
+    description: 'List of fulfillments containing application status information', 
+    type: [FulfillmentDto] 
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FulfillmentDto)
+  fulfillments: FulfillmentDto[];
 }
 
-
+class MessageDto {
+  @ApiProperty({ description: 'Order details with status information', type: OrderDto })
+  @ValidateNested()
+  @Type(() => OrderDto)
+  order: OrderDto;
+}
 
 export class StatusResponseDto {
-  @ApiProperty({ description: 'Context of the request', type: ContextDto })
+  @ApiProperty({ 
+    description: 'Context containing DSEP protocol metadata', 
+    type: ContextDto 
+  })
   @ValidateNested()
   @Type(() => ContextDto)
   context: ContextDto;
 
-
+  @ApiProperty({ 
+    description: 'Message containing order and application status', 
+    type: MessageDto 
+  })
+  @ValidateNested()
+  @Type(() => MessageDto)
+  message: MessageDto;
 }
