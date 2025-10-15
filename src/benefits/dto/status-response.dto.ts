@@ -250,45 +250,7 @@ class QuoteDto {
   breakup: QuoteBreakupDto[];
 }
 
-class OrderDto {
-  @ApiProperty({ description: 'Order ID', example: '12424kh' })
-  @IsString()
-  @IsNotEmpty()
-  id: string;
 
-  @ApiProperty({ description: 'Provider details', type: ProviderDto })
-  @ValidateNested()
-  @Type(() => ProviderDto)
-  provider: ProviderDto;
-
-  @ApiProperty({ description: 'List of items', type: [ItemDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ItemDto)
-  items: ItemDto[];
-
-  @ApiProperty({ description: 'Billing details', type: BillingDto })
-  @ValidateNested()
-  @Type(() => BillingDto)
-  billing: BillingDto;
-
-  @ApiProperty({ description: 'List of fulfillments', type: [FulfillmentDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FulfillmentDto)
-  fulfillments: FulfillmentDto[];
-
-  @ApiProperty({ description: 'List of payments', type: [PaymentDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PaymentDto)
-  payments: PaymentDto[];
-
-  @ApiProperty({ description: 'Quote details', type: QuoteDto })
-  @ValidateNested()
-  @Type(() => QuoteDto)
-  quote: QuoteDto;
-}
 
 class ContextDto {
   @ApiProperty({ description: 'Domain of the request', example: BENEFIT_CONSTANTS.FINANCE })
@@ -347,12 +309,7 @@ class ContextDto {
   message_id: string;
 }
 
-class MessageDto {
-  @ApiProperty({ description: 'Order details', type: OrderDto })
-  @ValidateNested()
-  @Type(() => OrderDto)
-  order: OrderDto;
-}
+
 
 export class StatusResponseDto {
   @ApiProperty({ description: 'Context of the request', type: ContextDto })
@@ -360,8 +317,5 @@ export class StatusResponseDto {
   @Type(() => ContextDto)
   context: ContextDto;
 
-  @ApiProperty({ description: 'Message containing order details', type: MessageDto })
-  @ValidateNested()
-  @Type(() => MessageDto)
-  message: MessageDto;
+
 }
