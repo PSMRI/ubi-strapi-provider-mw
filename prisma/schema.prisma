@@ -16,6 +16,7 @@ model Applications {
   createdAt                  DateTime           @default(now())
   updatedAt                  DateTime           @updatedAt
   bapId                      String?
+  bapApplicationId           String?
   customerId                 String?
   finalAmount                String?
   orderId                    String?
@@ -28,6 +29,7 @@ model Applications {
   eligibilityCheckedAt       DateTime?
   eligibilityResult          Json?
   eligibilityStatus          String?            @default("pending")
+  transactionId              String?
   applicationFiles           ApplicationFiles[] @relation("ApplicationsToApplicationFiles")
 }
 

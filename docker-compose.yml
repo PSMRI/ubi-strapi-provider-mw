@@ -1,0 +1,16 @@
+version: "3.6"
+
+services:
+  backend:
+    image: ubi-strapi-provider-mw-backend:latest
+    build:
+      context: ./ubi-strapi-provider-mw
+    container_name: "ubi-strapi-provider-mw-onest"
+    restart: always
+    ports:
+      - "7000:7000"
+    env_file:
+      - .env
+    volumes:
+     # - ./ubi-strapi-provider-mw:/app
+      - ./uploads:/app/uploads

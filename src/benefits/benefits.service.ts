@@ -13,15 +13,11 @@ import { HttpService } from '@nestjs/axios';
 import { SearchRequestDto } from './dto/search-request.dto';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-import {
-	generateRandomString,
-	getAuthToken,
-	titleCase,
-	unsetObjectKeys,
-} from 'src/common/util';
+import { generateRandomString, getAuthToken, titleCase, unsetObjectKeys } from 'src/common/util';
 import { PrismaService } from '../prisma.service';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { InitRequestDto } from './dto/init-request.dto';
+import { InitResponseDto } from './dto/init-response.dto';
 import { ConfirmRequestDto } from './dto/confirm-request.dto';
 import { SearchBenefitsDto } from './dto/search-benefits.dto';
 import { ConfirmResponseDto } from './dto/confirm-response.dto';
@@ -77,7 +73,7 @@ export class BenefitsService {
 	async getBenefits(body: SearchBenefitsDto, req: Request): Promise<any> {
 		const authToken = getAuthToken(req);
 		const page = body?.page ?? '1';
-		const pageSize = body?.pageSize ?? '100';
+		const pageSize = body?.pageSize ?? '1000';
 		const sort = body?.sort ?? 'createdAt:desc';
 		const locale = body?.locale ?? 'en';
 		const filters = body?.filters ?? {};
@@ -263,6 +259,7 @@ export class BenefitsService {
 			}
 
 			return mappedResponse;
+
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
@@ -277,64 +274,104 @@ export class BenefitsService {
 		}
 	}
 
-	async init(selectDto: InitRequestDto): Promise<any> {
+	async init(initRequestDto: InitRequestDto): Promise<InitResponseDto> {
+		// Validate BAP ID and URI
 		this.checkBapIdAndUri(
-			selectDto?.context?.bap_id,
-			selectDto?.context?.bap_uri,
+			initRequestDto?.context?.bap_id,
+			initRequestDto?.context?.bap_uri,
 		);
-		try {
-			const benefitId = selectDto.message.order.items[0].id;
 
-			// Fetch benefit data from the Strapi API
+		try {
+			// Extract applicationData from the payload
+			const applicationData = initRequestDto?.message?.order?.fulfillments?.[0]?.customer?.applicationData;
+
+			if (applicationData) {
+				// Application data extracted successfully
+			} else {
+				console.log('No applicationData found in payload');
+				throw new BadRequestException('ApplicationData is required in payload');
+			}
+
+			// Extract bap_application_id from applicationData
+			const bapApplicationId = applicationData?.bap_application_id;
+
+			// Extract transaction_id from context
+			const transactionId = initRequestDto?.context?.transaction_id;
+			if (!transactionId) {
+				throw new BadRequestException('transaction_id is required in context');
+			}
+
+			const item = initRequestDto?.message?.order?.items?.[0];
+			if (!item?.id) {
+				throw new BadRequestException('message.order.items[0].id is required');
+			}
+			const benefitId = item.id;
+
+			// Validate benefit exists before creating application
 			const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+			if (!benefitData?.data) {
+				throw new BadRequestException(`Benefit ${benefitId} not found`);
+			}
+
+			// Extract bapId from context
+			const bapId = initRequestDto?.context?.bap_id;
+			if (!bapId) {
+				throw new BadRequestException('bap_id is required in context');
+			}
+
+			// Add benefitId, transactionId, bapId to applicationData for application creation
+			const applicationDataWithContext = {
+				...applicationData,
+				benefitId: benefitId,
+				transactionId: transactionId,
+				bapId: bapId,
+			};
+
+			// Only add bap_application_id if it exists
+			if (bapApplicationId) {
+				applicationDataWithContext.bap_application_id = bapApplicationId;
+			}
+
+			// Create the application and get the real applicationId
+			const createdApplication = await this.applicationsService.create(applicationDataWithContext);
+			const applicationId = createdApplication.application.id;
 
 			let mappedResponse;
 
 			if (benefitData?.data) {
 				mappedResponse = await this.transformScholarshipsToOnestFormat(
-					selectDto,
+					initRequestDto,
 					[benefitData?.data?.data],
 					'on_init',
 				);
 			}
 
-			const xinput = {
-				head: {
-					descriptor: {
-						name: 'Application Form',
-					},
-					index: {
-						min: 0,
-						cur: 0,
-						max: 1,
-					},
-					headings: ['Personal Details'],
-				},
-				form: {
-					url: `${this.providerUrl}/benefit/apply/${benefitId}`, // React route for the benefit ID
-					mime_type: 'text/html',
-					resubmit: false,
-				},
-				required: true,
-			};
-
 			const { id, descriptor, categories, locations, items, rateable }: any =
 				mappedResponse?.message.catalog.providers?.[0] ?? {};
 
-			items[0].xinput = xinput;
+			if (!items || !id) {
+				throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
+			}
 
-			selectDto.message.order = {
-				...selectDto.message.order,
-				// Ensure the object matches the InitOrderDto type
-				providers: [{ id, descriptor, rateable, locations, categories }],
-				items,
-			};
+			// Add real applicationId and transactionId to the first item
+			if (!items?.[0]) {
+				throw new InternalServerErrorException('No items found in transformed benefit data');
+			}
+			items[0].applicationId = applicationId;
+			items[0].transactionId = transactionId;
 
-			selectDto.context = {
-				...selectDto.context,
-				...mappedResponse?.context,
+			return {
+				context: {
+					...initRequestDto.context,
+					...mappedResponse?.context,
+				},
+				message: {
+					order: {
+						providers: [{ id, descriptor, rateable, locations, categories }],
+						items
+					}
+				}
 			};
-			return selectDto;
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
@@ -344,9 +381,109 @@ export class BenefitsService {
 				);
 			}
 
-			console.error('Error in handleInit:', error);
+			console.error('Error in init:', error);
 			throw new InternalServerErrorException('Failed to initialize benefit');
 		}
+	}
+
+	/**
+	 * DSEP Update endpoint: always updates an existing application by orderId and transactionId
+	 */
+	async update(data: any): Promise<any> {
+		// Validate BAP ID and URI
+		this.checkBapIdAndUri(
+			data?.context?.bap_id,
+			data?.context?.bap_uri,
+		);
+
+		// Extract transaction_id from context
+		const transactionId = data?.context?.transaction_id;
+		if (!transactionId) {
+			throw new BadRequestException('transaction_id is required in context');
+		}
+
+		// Extract applicationId (id) and applicationData
+		const applicationId = data?.message?.order?.fulfillments?.[0]?.customer?.applicationData?.orderId ?? null;
+		if (!applicationId) throw new BadRequestException('orderId (applicationId) is required for update');
+		const applicationData = data?.message?.order?.fulfillments?.[0]?.customer?.applicationData ?? {};
+		if (!applicationData || Object.keys(applicationData).length === 0) {
+			throw new BadRequestException('applicationData is required for update');
+		}
+
+		// Extract bap_application_id from applicationData
+		const bapApplicationId = applicationData?.bap_application_id;
+
+		// Get benefitId from items[0].id
+		const item = data?.message?.order?.items?.[0];
+		if (!item?.id) {
+			throw new BadRequestException('message.order.items[0].id is required');
+		}
+		const benefitId = item.id;
+
+		// Validate benefit exists before updating application
+		const benefitData = await this.getBenefitsByIdStrapi(benefitId);
+		if (!benefitData?.data) {
+			throw new BadRequestException(`Benefit ${benefitId} not found`);
+		}
+
+		// Extract bapId from context
+		const bapId = data?.context?.bap_id;
+		if (!bapId) {
+			throw new BadRequestException('bap_id is required in context');
+		}
+
+		// Add benefitId, transactionId, bapId to applicationData for update
+		const applicationDataWithContext = {
+			...applicationData,
+			benefitId: benefitId,
+			transactionId: transactionId,
+			bapId: bapId,
+		};
+
+		// Only add bap_application_id if it exists
+		if (bapApplicationId) {
+			applicationDataWithContext.bap_application_id = bapApplicationId;
+		}
+
+		// Update the application using applicationId (id) (and transactionId will be matched internally)
+		await this.applicationsService.updateApplication(applicationId, applicationDataWithContext);
+
+		let mappedResponse;
+		if (benefitData?.data) {
+			mappedResponse = await this.transformScholarshipsToOnestFormat(
+				data,
+				[benefitData?.data?.data],
+				'on_update',
+			);
+		}
+
+		const { id, descriptor, categories, locations, items, rateable }: any =
+			mappedResponse?.message.catalog.providers?.[0] ?? {};
+
+		if (!items || !id) {
+			throw new InternalServerErrorException('Failed to transform benefit data to ONEST format');
+		}
+
+		// Add real applicationId and transactionId to the first item
+		if (!items?.[0]) {
+			throw new InternalServerErrorException('No items found in transformed benefit data');
+		}
+		items[0].applicationId = applicationId;
+		items[0].transactionId = transactionId;
+
+		// Return context and message - responses[0] will come from network layer
+		return {
+			context: {
+				...data.context,
+				...mappedResponse?.context,
+			},
+			message: {
+				order: {
+					providers: [{ id, descriptor, rateable, locations, categories }],
+					items
+				}
+			}
+		};
 	}
 
 	async confirm(confirmDto: ConfirmRequestDto): Promise<any> {
@@ -430,15 +567,16 @@ export class BenefitsService {
 		);
 		try {
 			const statusData = new StatusResponseDto();
-
+			console.log("BPP status API:", statusDto);
 			// Extract order ID from the request body
 			const orderId = statusDto?.message?.order_id;
+			console.log('Status check for orderId:', orderId);
 
 			// Fetch application details using the order ID
 			const applicationData = await this.applicationsService.find({
 				orderId,
 			});
-
+			console.log("BPP status API applicationData:", applicationData);
 			if (!applicationData || applicationData.length === 0) {
 				throw new BadRequestException(
 					'No application found for the given order ID',
@@ -541,7 +679,7 @@ export class BenefitsService {
 				...statusDto.context,
 				...mappedResponse?.context,
 			};
-
+			console.log("BPP status API statusData:", statusData);
 			return statusData;
 		} catch (error) {
 			if (error.isAxiosError) {

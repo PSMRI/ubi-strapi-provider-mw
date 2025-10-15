@@ -84,7 +84,14 @@ class InitOrderDto {
   @Type(() => InitItemDto)
   items: InitItemDto[];
 
-  providers: object
+  @ApiPropertyOptional({ description: 'List of providers' })
+  @IsOptional()
+  @IsArray()
+  providers?: any[];
+
+  @ApiProperty({ description: 'List of fulfillments' })
+  @IsArray()
+  fulfillments: any[];
 }
 
 class InitMessageDto {

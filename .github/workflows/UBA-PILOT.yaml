@@ -1,19 +1,19 @@
 name: Deploy to UBA-PILOT
 
 on:
+  # ✅ Manual trigger with validated TAG input
   workflow_dispatch:
     inputs:
       TAG:
-        description: 'Docker image tag to deploy'
+        description: 'Docker image tag to deploy (must match vX.Y.Z or vX.Y.Z-<suffix>)'
         required: true
         default: 'v0.0.0'
-      BRANCH:
-        description: 'Git branch to deploy'
-        required: true
-        default: 'main'
+
+  # ✅ Automatic trigger on version tag push (regex-based)
   push:
     tags:
-      - '*'  # Trigger on any tag push
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 jobs:
   Deploy_on_UBA_PILOT:
@@ -22,35 +22,66 @@ jobs:
     environment: UBA-DEPWD-PILOT
 
     steps:
+      # ✅ Validate TAG format for manual runs only
+      - name: Validate TAG format
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          TAG="${{ github.event.inputs.TAG }}"
+          echo "Validating TAG: $TAG"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "❌ Invalid TAG format. Must match vX.Y.Z or vX.Y.Z-<suffix>"
+            exit 1
+          fi
+          echo "✅ TAG format is valid"
+
       - name: Deploy Strapi MW via SSH
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.9
         with:
-          host: ${{ secrets.HOST_NAME_PILOT }}
-          username: ${{ secrets.USERNAME_PILOT }}
-          key: ${{ secrets.EC2_SSH_KEY_PILOT }}
-          port: ${{ secrets.PORT_PILOT }}
+          host: ${{ secrets.HOST_NAME }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.PORT }}
           script: |
-            # ----- Set environment variables -----
-            export BASE_DIR="${{ secrets.TARGET_DIR_PILOT }}"
+            echo "🚀 Starting UBA-PILOT Strapi Middleware deployment..."
+
+            # ----- Variables -----
+            export BASE_DIR="${{ secrets.TARGET_DIR }}"
             export REPO_NAME="ubi-strapi-provider-mw"
             export REPO_URL="https://github.com/PSMRI/ubi-strapi-provider-mw.git"
-            export BRANCH="${{ github.event.inputs.BRANCH || 'main' }}"
-            export TAG="${{ github.event.inputs.TAG || github.ref_name || 'latest' }}"
             export CONTAINER_NAME="ubi-strapi-provider-mw-onest"
+            export SERVICE_NAME="strapi-mw"
 
+            # ----- Determine TAG -----
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              TAG="${{ github.event.inputs.TAG }}"
+            else
+              TAG="${{ github.ref_name }}"
+            fi
+
+            # ----- Get current branch -----
+            BRANCH="${GITHUB_REF_NAME:-main}"
+
+            echo "Deploying TAG: $TAG from branch: $BRANCH"
+
+            # ----- Navigate to base directory -----
             cd "$BASE_DIR" || exit 1
 
-            # ----- Prepare .env -----
+            # ----- Prepare environment file -----
             if [ -f .env ]; then rm .env; fi
-            echo '${{ secrets.ENV_PILOT }}' > .env
+            echo "${{ secrets.ENV }}" > .env
+
+            # ----- Ensure deploy.sh is executable -----
+            chmod +x deploy.sh
 
             # ----- Run deploy script -----
-            bash deploy.sh
+            SERVICE_NAME="$SERVICE_NAME" CONTAINER_NAME="$CONTAINER_NAME" TAG="$TAG" BRANCH="$BRANCH" REPO_NAME="$REPO_NAME" REPO_URL="$REPO_URL" ./deploy.sh
 
+      # ✅ Slack notification always runs (success or fail)
       - name: Notify on Slack channel
         uses: iRoachie/slack-github-actions@v2.3.2
+        if: ${{ always() }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           status: ${{ job.status }}
-        if: ${{ always() }}
+          fields: repo,commit,author
