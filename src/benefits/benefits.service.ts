@@ -107,7 +107,7 @@ export class BenefitsService {
 		// Filter benefits to only include published ones
 		if (response?.data?.results) {
 			response.data.results = response.data.results.filter(
-				(benefit: any) => benefit.status === 'published'
+				(benefit: any) => benefit.status === 'published',
 			);
 		}
 
@@ -161,10 +161,16 @@ export class BenefitsService {
 
 		// If authToken is provided and it's not the same as the default strapi token,
 		// use the content-manager endpoint with the provided token
-		if (authToken && authToken !== this.strapiToken && authToken !== `Bearer ${this.strapiToken}`) {
+		if (
+			authToken &&
+			authToken !== this.strapiToken &&
+			authToken !== `Bearer ${this.strapiToken}`
+		) {
 			url = `${this.strapiUrl}/content-manager/collection-types/api::benefit.benefit/${id}`;
 			// Ensure the token has Bearer prefix
-			authorizationHeader = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+			authorizationHeader = authToken.startsWith('Bearer ')
+				? authToken
+				: `Bearer ${authToken}`;
 		}
 
 		const response = await this.httpService.axiosRef.get(url, {
@@ -199,7 +205,10 @@ export class BenefitsService {
 		}
 	}
 
-	async searchBenefits(searchRequest: SearchRequestDto, authToken?: string): Promise<SearchResponseDto> {
+	async searchBenefits(
+		searchRequest: SearchRequestDto,
+		authToken?: string,
+	): Promise<SearchResponseDto> {
 		if (searchRequest.context.domain === this.domain) {
 			let url = `${this.strapiUrl}/api/benefits${this.urlExtension}`;
 
@@ -501,6 +510,7 @@ export class BenefitsService {
 					confirmDto,
 					[benefitData?.data?.data],
 					'on_confirm',
+					false,
 				);
 			}
 
@@ -524,7 +534,6 @@ export class BenefitsService {
 
 			confirmData['message'] = {
 				order: {
-					...confirmDto.message.order,
 					provider: { id, descriptor, rateable, locations },
 					items,
 					id: orderDetails.orderId ?? '',
@@ -624,80 +633,19 @@ export class BenefitsService {
 
 			// Prepare the status object
 			const metadata = {
-				billing: {
-					name: 'N/A',
-					phone: 'N/A',
-					email: 'dummyemail@dummydomain.com',
-					address: 'N/A',
-					organization: {
-						"descriptor": {
-							"name": "Onest",
-							"code": "onest.com"
-						},
-						"contact": {
-							"phone": "+91-8888888888",
-							"email": "scholarships@nammayatri.in"
-						}
-					},
-				},
-				payments: [
+				fulfillments: [
 					{
-						params: {
-							bank_code: 'ICICI',
-							bank_account_number: '123456789012',
-							bank_account_name: 'John Doe',
+						id: 'FULFILL_UNIFIED',
+						type: 'APPLICATION',
+						tracking: false,
+						state: {
+							descriptor: {
+								...statusCode,
+							},
+							updated_at: new Date().toISOString(),
 						},
-						type: 'PRE-ORDER',
-						status: 'PAID',
-						collected_by: 'bpp',
 					},
 				],
-				fulfillments: [{
-					id: 'FULFILL_UNIFIED',
-					type: 'APPLICATION',
-					tracking: false,
-					state: {
-						descriptor: {
-							...statusCode
-						},
-						updated_at: new Date().toISOString(),
-					},
-					agent: {
-						"person": {
-							"name": "Ekstep Foundation SPoc"
-						},
-						"contact": {
-							"email": "ekstepsupport@ekstep.com"
-						},
-					},
-					customer: {
-						"id": "aadhaar:798677675565",
-						"person": {
-							"name": "Jane Doe",
-							"age": "13",
-							"gender": "female"
-						},
-						"contact": {
-							"phone": "+91-9663088848",
-							"email": "jane.doe@example.com"
-						}
-					}
-				}],
-				quote: {
-					price: {
-						currency: 'INR',
-						value: '123',
-					},
-					breakup: [
-						{
-							title: 'Tuition Fee',
-							price: {
-								currency: 'INR',
-								value: '123',
-							},
-						}
-					]
-				},
 			};
 			let mappedResponse;
 			if (benefitData?.data) {
@@ -705,8 +653,8 @@ export class BenefitsService {
 					statusDto,
 					[benefitData?.data?.data],
 					'on_status',
+					false,
 				);
-
 			}
 
 			const { id, descriptor, items, rateable }: any = mappedResponse?.message
@@ -757,7 +705,12 @@ export class BenefitsService {
 		this.bapUri = bapUri;
 	}
 
-	async transformScholarshipsToOnestFormat(reqData, apiResponseArray: any[], action?) {
+	async transformScholarshipsToOnestFormat(
+		reqData,
+		apiResponseArray: any[],
+		action?,
+		includeTags: boolean = true,
+	) {
 		if (!Array.isArray(apiResponseArray)) {
 			throw new Error('Expected an array of benefits');
 		}
@@ -778,40 +731,27 @@ export class BenefitsService {
 					documentId,
 				} = benefit;
 
-				const [
-					eligibilityTags,
-					documentTags,
-					benefitTags,
-					exclusionTags,
-					sponsoringEntitiesTags,
-					applicationFormTags,
-				] = await Promise.all([
-					this.formatEligibilityTags(eligibility),
-					this.formatDocumentTags(documents),
-					this.formatBenefitTags(benefits),
-					this.formatExclusionTags(exclusions),
-					this.formatSponsoringEntities(sponsoringEntities),
-					this.formatApplicationForm(applicationForm),
-				]);
+				// Conditionally fetch tags based on includeTags parameter
+				let tags: TagDto[] | undefined;
 
-				return {
-					id: documentId,
-					descriptor: {
-						name: title,
-						long_desc: longDescription,
-					},
-					price: {
-						currency: 'INR',
-						value: await this.calculateTotalBenefitValue(benefits), // await here!
-					},
-					time: {
-						range: {
-							start: new Date(applicationOpenDate).toISOString(),
-							end: new Date(applicationCloseDate).toISOString(),
-						},
-					},
-					rateable: false,
-					tags: [
+				if (includeTags) {
+					const [
+						eligibilityTags,
+						documentTags,
+						benefitTags,
+						exclusionTags,
+						sponsoringEntitiesTags,
+						applicationFormTags,
+					] = await Promise.all([
+						this.formatEligibilityTags(eligibility),
+						this.formatDocumentTags(documents),
+						this.formatBenefitTags(benefits),
+						this.formatExclusionTags(exclusions),
+						this.formatSponsoringEntities(sponsoringEntities),
+						this.formatApplicationForm(applicationForm),
+					]);
+
+					tags = [
 						eligibilityTags,
 						documentTags,
 						benefitTags,
@@ -820,8 +760,34 @@ export class BenefitsService {
 						applicationFormTags,
 					]
 						.filter(Boolean)
-						.flat() as TagDto[],
+						.flat() as TagDto[];
+				}
+
+				const itemResponse: any = {
+					id: documentId,
+					descriptor: {
+						name: title,
+						long_desc: longDescription,
+					},
+					price: {
+						currency: 'INR',
+						value: await this.calculateTotalBenefitValue(benefits),
+					},
+					time: {
+						range: {
+							start: new Date(applicationOpenDate).toISOString(),
+							end: new Date(applicationCloseDate).toISOString(),
+						},
+					},
+					rateable: false,
 				};
+
+				// Only include tags property if includeTags is true
+				if (includeTags && tags) {
+					itemResponse.tags = tags;
+				}
+
+				return itemResponse;
 			}),
 		);
 
@@ -1026,7 +992,7 @@ export class BenefitsService {
 					const enrichedField = {
 						...field,
 						fieldsGroupName: fieldGroup.fieldsGroupName,
-						fieldsGroupLabel: fieldGroup.fieldsGroupLabel
+						fieldsGroupLabel: fieldGroup.fieldsGroupLabel,
 					};
 					allFields.push(enrichedField);
 				});
