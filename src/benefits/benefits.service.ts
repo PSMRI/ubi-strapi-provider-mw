@@ -13,7 +13,12 @@ import { HttpService } from '@nestjs/axios';
 import { SearchRequestDto } from './dto/search-request.dto';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-import { generateRandomString, getAuthToken, titleCase, unsetObjectKeys } from 'src/common/util';
+import {
+	generateRandomString,
+	getAuthToken,
+	titleCase,
+	unsetObjectKeys,
+} from 'src/common/util';
 import { PrismaService } from '../prisma.service';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { InitRequestDto } from './dto/init-request.dto';
@@ -31,7 +36,7 @@ export class BenefitsService {
 	private readonly strapiUrl: string;
 	private readonly strapiToken: string;
 	private readonly providerUrl: string;
-  private readonly domain: string;
+	private readonly domain: string;
 	private readonly bppId: string;
 	private readonly bppUri: string;
 	private bapId: string;
@@ -61,7 +66,7 @@ export class BenefitsService {
 			!this.providerUrl.trim().length ||
 			!this.bppId.trim().length ||
 			!this.bppUri.trim().length ||
-      !this.domain.trim().length
+			!this.domain.trim().length
 		) {
 			throw new InternalServerErrorException(
 				'One or more required environment variables are missing or empty: STRAPI_URL, STRAPI_TOKEN, PROVIDER_UBA_UI_URL, BPP_ID, BPP_URI, DOMAIN',
@@ -106,7 +111,7 @@ export class BenefitsService {
 		// Filter benefits to only include published ones
 		if (response?.data?.results) {
 			response.data.results = response.data.results.filter(
-				(benefit: any) => benefit.status === 'published'
+				(benefit: any) => benefit.status === 'published',
 			);
 		}
 
@@ -160,10 +165,16 @@ export class BenefitsService {
 
 		// If authToken is provided and it's not the same as the default strapi token,
 		// use the content-manager endpoint with the provided token
-		if (authToken && authToken !== this.strapiToken && authToken !== `Bearer ${this.strapiToken}`) {
+		if (
+			authToken &&
+			authToken !== this.strapiToken &&
+			authToken !== `Bearer ${this.strapiToken}`
+		) {
 			url = `${this.strapiUrl}/content-manager/collection-types/api::benefit.benefit/${id}`;
 			// Ensure the token has Bearer prefix
-			authorizationHeader = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+			authorizationHeader = authToken.startsWith('Bearer ')
+				? authToken
+				: `Bearer ${authToken}`;
 		}
 
 		const response = await this.httpService.axiosRef.get(url, {
@@ -198,13 +209,16 @@ export class BenefitsService {
 		}
 	}
 
-  async searchBenefits(searchRequest: SearchRequestDto, authToken?: string): Promise<SearchResponseDto> {
-    if (searchRequest.context.domain === this.domain) {
-      let url = `${this.strapiUrl}/api/benefits${this.urlExtension}`;
+	async searchBenefits(
+		searchRequest: SearchRequestDto,
+		authToken?: string,
+	): Promise<SearchResponseDto> {
+		if (searchRequest.context.domain === this.domain) {
+			let url = `${this.strapiUrl}/api/benefits${this.urlExtension}`;
 
-      // if (authToken) {
-      // url = `${this.strapiUrl}/content-manager/collection-types/api::benefit.benefit?${queryString}`;
-      //}
+			// if (authToken) {
+			// url = `${this.strapiUrl}/content-manager/collection-types/api::benefit.benefit?${queryString}`;
+			//}
 
 			this.checkBapIdAndUri(
 				searchRequest?.context?.bap_id,
@@ -217,15 +231,15 @@ export class BenefitsService {
 				},
 			});
 
-      let mappedResponse = new SearchResponseDto();
+			let mappedResponse = new SearchResponseDto();
 
-      if (response?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          searchRequest,
-          response?.data?.data,
-          'on_search',
-        );
-      }
+			if (response?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					searchRequest,
+					response?.data?.data,
+					'on_search',
+				);
+			}
 
 			return mappedResponse;
 		}
@@ -238,15 +252,15 @@ export class BenefitsService {
 		try {
 			let id = body.message.order.items[0].id;
 
-      const response = await this.getBenefitsByIdStrapi(id);
-      let mappedResponse;
-      if (response?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          body,
-          [response?.data?.data],
-          'on_select',
-        );
-      }
+			const response = await this.getBenefitsByIdStrapi(id);
+			let mappedResponse;
+			if (response?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					body,
+					[response?.data?.data],
+					'on_select',
+				);
+			}
 
 			return mappedResponse;
 		} catch (error) {
@@ -276,13 +290,13 @@ export class BenefitsService {
 
 			let mappedResponse;
 
-      if (benefitData?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          selectDto,
-          [benefitData?.data?.data],
-          'on_init',
-        );
-      }
+			if (benefitData?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					selectDto,
+					[benefitData?.data?.data],
+					'on_init',
+				);
+			}
 
 			const xinput = {
 				head: {
@@ -353,14 +367,15 @@ export class BenefitsService {
 			}
 			const benefitData = await this.getBenefitsByIdStrapi(benefit.benefitId); // from strapi
 
-      let mappedResponse;
-      if (benefitData?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          confirmDto,
-          [benefitData?.data?.data],
-          'on_confirm',
-        );
-      }
+			let mappedResponse;
+			if (benefitData?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					confirmDto,
+					[benefitData?.data?.data],
+					'on_confirm',
+					false,
+				);
+			}
 
 			// Generate order ID
 			const orderId: string =
@@ -382,7 +397,6 @@ export class BenefitsService {
 
 			confirmData['message'] = {
 				order: {
-					...confirmDto.message.order,
 					provider: { id, descriptor, rateable, locations },
 					items,
 					id: orderDetails.orderId ?? '',
@@ -479,92 +493,31 @@ export class BenefitsService {
 				};
 			}
 
-      // Prepare the status object
-      const metadata = {
-        billing: {
-          name: 'N/A',
-          phone: 'N/A',
-          email: 'dummyemail@dummydomain.com',
-          address: 'N/A',
-          organization: {
-            "descriptor": {
-              "name": "Onest",
-              "code": "onest.com"
-            },
-            "contact": {
-              "phone": "+91-8888888888",
-              "email": "scholarships@nammayatri.in"
-            }
-          },
-        },
-        payments: [
-          {
-            params: {
-              bank_code: 'ICICI',
-              bank_account_number: '123456789012',
-              bank_account_name: 'John Doe',
-            },
-            type: 'PRE-ORDER',
-            status: 'PAID',
-            collected_by: 'bpp',
-          },
-        ],
-        fulfillments: [{
-          id: 'FULFILL_UNIFIED',
-          type: 'APPLICATION',
-          tracking: false,
-          state: {
-            descriptor: {
-              ...statusCode
-            },
-            updated_at: new Date().toISOString(),
-          },
-          agent: {
-            "person": {
-              "name": "Ekstep Foundation SPoc"
-            },
-            "contact": {
-              "email": "ekstepsupport@ekstep.com"
-            },
-          },
-          customer: {
-            "id": "aadhaar:798677675565",
-            "person": {
-              "name": "Jane Doe",
-              "age": "13",
-              "gender": "female"
-            },
-            "contact": {
-              "phone": "+91-9663088848",
-              "email": "jane.doe@example.com"
-            }
-          }
-        }],
-        quote: {
-          price: {
-            currency: 'INR',
-            value: '123',
-          },
-          breakup: [
-            {
-              title: 'Tuition Fee',
-              price: {
-                currency: 'INR',
-                value: '123',
-              },
-            }
-          ]
-        },
-      };
-      let mappedResponse;
-      if (benefitData?.data) {
-        mappedResponse = await this.transformScholarshipsToOnestFormat(
-          statusDto,
-          [benefitData?.data?.data],
-          'on_status',
-        );
-
-      }
+			// Prepare the status object
+			const metadata = {
+				fulfillments: [
+					{
+						id: 'FULFILL_UNIFIED',
+						type: 'APPLICATION',
+						tracking: false,
+						state: {
+							descriptor: {
+								...statusCode,
+							},
+							updated_at: new Date().toISOString(),
+						},
+					},
+				],
+			};
+			let mappedResponse;
+			if (benefitData?.data) {
+				mappedResponse = await this.transformScholarshipsToOnestFormat(
+					statusDto,
+					[benefitData?.data?.data],
+					'on_status',
+					false,
+				);
+			}
 
 			const { id, descriptor, items, rateable }: any = mappedResponse?.message
 				.catalog.providers?.[0] ?? {
@@ -614,10 +567,15 @@ export class BenefitsService {
 		this.bapUri = bapUri;
 	}
 
-  async transformScholarshipsToOnestFormat(reqData, apiResponseArray: any[], action?) {
-    if (!Array.isArray(apiResponseArray)) {
-      throw new Error('Expected an array of benefits');
-    }
+	async transformScholarshipsToOnestFormat(
+		reqData,
+		apiResponseArray: any[],
+		action?,
+		includeTags: boolean = true,
+	) {
+		if (!Array.isArray(apiResponseArray)) {
+			throw new Error('Expected an array of benefits');
+		}
 
 		const items = await Promise.all(
 			apiResponseArray.map(async (benefit) => {
@@ -635,121 +593,134 @@ export class BenefitsService {
 					documentId,
 				} = benefit;
 
-				const [
-					eligibilityTags,
-					documentTags,
-					benefitTags,
-					exclusionTags,
-					sponsoringEntitiesTags,
-					applicationFormTags,
-				] = await Promise.all([
-					this.formatEligibilityTags(eligibility),
-					this.formatDocumentTags(documents),
-					this.formatBenefitTags(benefits),
-					this.formatExclusionTags(exclusions),
-					this.formatSponsoringEntities(sponsoringEntities),
-					this.formatApplicationForm(applicationForm),
-				]);
+				// Conditionally fetch tags based on includeTags parameter
+				let tags: TagDto[] | undefined;
 
-        return {
-          id: documentId,
-          descriptor: {
-            name: title,
-            long_desc: longDescription,
-          },
-          price: {
-            currency: 'INR',
-            value: await this.calculateTotalBenefitValue(benefits), // await here!
-          },
-          time: {
-            range: {
-              start: new Date(applicationOpenDate).toISOString(),
-              end: new Date(applicationCloseDate).toISOString(),
-            },
-          },
-          rateable: false,
-          tags: [
-            eligibilityTags,
-            documentTags,
-            benefitTags,
-            exclusionTags,
-            sponsoringEntitiesTags,
-            applicationFormTags,
-          ]
-            .filter(Boolean)
-            .flat() as TagDto[],
-        };
-      }),
-    );
+				if (includeTags) {
+					const [
+						eligibilityTags,
+						documentTags,
+						benefitTags,
+						exclusionTags,
+						sponsoringEntitiesTags,
+						applicationFormTags,
+					] = await Promise.all([
+						this.formatEligibilityTags(eligibility),
+						this.formatDocumentTags(documents),
+						this.formatBenefitTags(benefits),
+						this.formatExclusionTags(exclusions),
+						this.formatSponsoringEntities(sponsoringEntities),
+						this.formatApplicationForm(applicationForm),
+					]);
+
+					tags = [
+						eligibilityTags,
+						documentTags,
+						benefitTags,
+						exclusionTags,
+						sponsoringEntitiesTags,
+						applicationFormTags,
+					]
+						.filter(Boolean)
+						.flat() as TagDto[];
+				}
+
+				const itemResponse: any = {
+					id: documentId,
+					descriptor: {
+						name: title,
+						long_desc: longDescription,
+					},
+					price: {
+						currency: 'INR',
+						value: await this.calculateTotalBenefitValue(benefits),
+					},
+					time: {
+						range: {
+							start: new Date(applicationOpenDate).toISOString(),
+							end: new Date(applicationCloseDate).toISOString(),
+						},
+					},
+					rateable: false,
+				};
+
+				// Only include tags property if includeTags is true
+				if (includeTags && tags) {
+					itemResponse.tags = tags;
+				}
+
+				return itemResponse;
+			}),
+		);
 
 		const firstScholarship = apiResponseArray[0];
 
-    return {
-      context: {
-        version: '1.1.0',
-        ttl: 'PT10M',
-        ...reqData.context,
-        domain: this.domain,
-        action: action,
-        transaction_id: uuidv4(),
-        message_id: uuidv4(),
-        timestamp: new Date().toISOString(),
-        bap_id: this.bapId,
-        bap_uri: this.bapUri,
-        bpp_id: this.bppId,
-        bpp_uri: this.bppUri,
-      },
-      message: {
-        catalog: {
-          descriptor: {
-            name: this.bppId,
-          },
-          providers: [
-            {
-              id: this.bppId,
-              descriptor: {
-                name:
-                  firstScholarship?.providingEntity?.name ?? 'Unknown Provider',
-                short_desc: 'Multiple scholarships offered',
-                images: firstScholarship?.imageUrl
-                  ? [firstScholarship.imageUrl]
-                  : [],
-              },
-              categories: [
-                {
-                  id: 'CAT_SCHOLARSHIP',
-                  descriptor: {
-                    code: 'scholarship',
-                    name: 'Scholarship',
-                  },
-                },
-              ],
-              fulfillments: [
-                {
-                  id: 'FULFILL_UNIFIED',
-                  tracking: false,
-                },
-              ],
-              locations: [
-                {
-                  id: 'L1',
-                  city: {
-                    name: 'Pune',
-                    code: 'std:020',
-                  },
-                  state: {
-                    name: 'Maharashtra',
-                    code: 'MH',
-                  },
-                },
-              ],
-              items,
-            },
-          ],
-        },
-      },
-    };
-  }
+		return {
+			context: {
+				version: '1.1.0',
+				ttl: 'PT10M',
+				...reqData.context,
+				domain: this.domain,
+				action: action,
+				transaction_id: uuidv4(),
+				message_id: uuidv4(),
+				timestamp: new Date().toISOString(),
+				bap_id: this.bapId,
+				bap_uri: this.bapUri,
+				bpp_id: this.bppId,
+				bpp_uri: this.bppUri,
+			},
+			message: {
+				catalog: {
+					descriptor: {
+						name: this.bppId,
+					},
+					providers: [
+						{
+							id: this.bppId,
+							descriptor: {
+								name:
+									firstScholarship?.providingEntity?.name ?? 'Unknown Provider',
+								short_desc: 'Multiple scholarships offered',
+								images: firstScholarship?.imageUrl
+									? [firstScholarship.imageUrl]
+									: [],
+							},
+							categories: [
+								{
+									id: 'CAT_SCHOLARSHIP',
+									descriptor: {
+										code: 'scholarship',
+										name: 'Scholarship',
+									},
+								},
+							],
+							fulfillments: [
+								{
+									id: 'FULFILL_UNIFIED',
+									tracking: false,
+								},
+							],
+							locations: [
+								{
+									id: 'L1',
+									city: {
+										name: 'Pune',
+										code: 'std:020',
+									},
+									state: {
+										name: 'Maharashtra',
+										code: 'MH',
+									},
+								},
+							],
+							items,
+						},
+					],
+				},
+			},
+		};
+	}
 
 	// Calculate a rough total of monetary benefits if known
 	async calculateTotalBenefitValue(benefits) {
@@ -774,7 +745,7 @@ export class BenefitsService {
 				code: 'eligibility',
 				name: 'Eligibility',
 			},
-			list:eligibility.map( (e) =>({
+			list: eligibility.map((e) => ({
 				descriptor: {
 					code: e.evidence,
 					name:
@@ -799,7 +770,7 @@ export class BenefitsService {
 				code: 'required-docs',
 				name: 'Required Documents',
 			},
-			list: documents.map( (doc) => ({
+			list: documents.map((doc) => ({
 				descriptor: {
 					code: doc.isRequired ? 'mandatory-doc' : 'optional-doc',
 					name: doc.isRequired ? 'Mandatory Document' : 'Optional Document',
@@ -819,12 +790,12 @@ export class BenefitsService {
 				code: 'benefits',
 				name: 'Benefits',
 			},
-			list: benefits.map( (b) => ({
+			list: benefits.map((b) => ({
 				descriptor: {
 					code: 'financial',
 					name: b.title,
 				},
-				value: JSON.stringify(unsetObjectKeys(b, ['id','__component'])),	
+				value: JSON.stringify(unsetObjectKeys(b, ['id', '__component'])),
 				display: true,
 			})),
 		};
@@ -839,7 +810,7 @@ export class BenefitsService {
 				code: 'exclusions',
 				name: 'Exclusions',
 			},
-			list: exclusions.map( (e) => ({
+			list: exclusions.map((e) => ({
 				descriptor: {
 					code: 'ineligibility',
 					name: 'Ineligibility Condition',
@@ -859,7 +830,7 @@ export class BenefitsService {
 				code: 'sponsoringEntities',
 				name: 'Sponsoring Entities',
 			},
-			list: sponsoringEntities.map( (sponsoringEntity) => ({
+			list: sponsoringEntities.map((sponsoringEntity) => ({
 				descriptor: {
 					code: 'sponsoringEntities',
 					name: 'Entities Sponsoring Benefits',
@@ -875,7 +846,7 @@ export class BenefitsService {
 
 		// Flatten all fields from all field groups
 		const allFields: any[] = [];
-		
+
 		applicationForm.forEach((fieldGroup: any) => {
 			if (fieldGroup.fields && Array.isArray(fieldGroup.fields)) {
 				fieldGroup.fields.forEach((field: any) => {
@@ -883,7 +854,7 @@ export class BenefitsService {
 					const enrichedField = {
 						...field,
 						fieldsGroupName: fieldGroup.fieldsGroupName,
-						fieldsGroupLabel: fieldGroup.fieldsGroupLabel
+						fieldsGroupLabel: fieldGroup.fieldsGroupLabel,
 					};
 					allFields.push(enrichedField);
 				});
@@ -896,7 +867,7 @@ export class BenefitsService {
 				code: 'applicationForm',
 				name: 'Application Form',
 			},
-			list: allFields.map( (field) => ({
+			list: allFields.map((field) => ({
 				descriptor: {
 					code: 'applicationFormField-' + field.name,
 					name: 'Application Form Field - ' + field.label,
