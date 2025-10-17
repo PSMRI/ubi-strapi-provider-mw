@@ -473,11 +473,9 @@ export class ApplicationsService {
 	// Get all applications with benefit details
 	async findAll(listDto: ListApplicationsDto, req: Request) {
 		const authToken = getAuthToken(req);
-
-		// Get user from request middleware
 		const userId = (req as any).mw_userid;
 
-		// Check if user can access this application
+		// Check if user can access this benefit
 		const canAccess = await this.aclService.canAccessBenefit(
 			listDto.benefitId,
 			authToken,
@@ -489,14 +487,28 @@ export class ApplicationsService {
 			);
 		}
 
-		const applications = await this.prisma.applications.findMany({
-			where: {
-				benefitId: listDto.benefitId,
-			},
+		// Revised where clause without search logic
+		const whereClause: Prisma.ApplicationsWhereInput = {
+			benefitId: listDto.benefitId,
+			// Additional conditions can go here
+		};
+
+		// Get total count for the matching applications
+		const total = await this.prisma.applications.count({
+			where: whereClause,
 		});
 
-		// Enrich applications with benefit details
+		const applications = await this.prisma.applications.findMany({
+			where: whereClause,
+			orderBy: {
+				[listDto.orderBy ?? 'updatedAt']: listDto.orderDirection ?? 'desc',
+			},
+			skip: listDto.offset,
+			take: listDto.limit,
+		});
+
 		let benefit: BenefitDetail | null = null;
+		// Enrich applications with benefit details
 		try {
 			const benefitDetail = await this.benefitsService.getBenefitsByIdStrapi(
 				`${listDto.benefitId}`,
@@ -514,7 +526,15 @@ export class ApplicationsService {
 			);
 		}
 
-		return { applications, benefit };
+		return {
+			applications,
+			benefit,
+			pagination: {
+				total,
+				limit: listDto.limit,
+				offset: listDto.offset
+			}
+		};
 	}
 
 	// Get a single application by ID
@@ -765,6 +785,9 @@ export class ApplicationsService {
 			return await this.prisma.applications.findMany({
 				where: {
 					benefitId,
+				},
+				orderBy: {
+					updatedAt: 'desc', // LIFO order: most recently updated first
 				},
 			});
 		} catch (error) {
@@ -1290,6 +1313,9 @@ export class ApplicationsService {
 					eligibilityStatus: {
 						in: ['eligible', 'ineligible'],
 					},
+				},
+				orderBy: {
+					updatedAt: 'desc', // LIFO order: most recently updated first
 				},
 			});
 		} catch (error) {

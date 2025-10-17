@@ -53,15 +53,22 @@ export class ApplicationsController {
 		return this.applicationsService.create(data);
 	}
 
-  @Get()
-  @ApiBasicAuth('access-token')
-  @UseGuards(AuthGuard)
-  @ApiOperation(ApplicationsApiDocs.findAll.operation)
-  @ApiResponse(ApplicationsApiDocs.findAll.responses.success)
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async findAll(@Query() listDto: ListApplicationsDto, @Req() req: Request) {
-    return this.applicationsService.findAll(listDto, req);
-  }
+	@Post('list')  // Changed to POST with 'list' path to avoid conflict with existing POST /applications
+	@ApiBasicAuth('access-token')
+	@UseGuards(AuthGuard)
+	@ApiOperation({
+		summary: 'List applications with pagination and search',
+		description: 'Returns paginated list of applications for a benefit with optional search'
+	})
+	@ApiBody({ type: ListApplicationsDto })
+	@ApiResponse({
+		status: 200,
+		description: 'Applications retrieved successfully with pagination metadata'
+	})
+	@UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+	async findAll(@Body() listDto: ListApplicationsDto, @Req() req: Request) {
+		return this.applicationsService.findAll(listDto, req);
+	}
 
   @Get(':id')
   @ApiBasicAuth('access-token')
