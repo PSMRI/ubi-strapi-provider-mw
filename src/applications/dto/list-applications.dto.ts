@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsInt, Min, IsString, IsNotEmpty, IsIn } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsString, IsNotEmpty, IsIn, IsArray, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApplicationStatus } from './update-application-status.dto';
 
 export class ListApplicationsDto {
   @ApiProperty({
@@ -17,11 +18,13 @@ export class ListApplicationsDto {
     required: false,
     default: 20,
     minimum: 1,
+    maximum: 100,
     example: 20
   })
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   @IsOptional()
   limit?: number = 20;
 
@@ -39,12 +42,13 @@ export class ListApplicationsDto {
   @ApiProperty({
     description: 'Field to order by',
     required: false,
-    enum: ['updatedAt', 'createdAt'],
+    enum: ['updatedAt', 'createdAt', 'id'],
     example: 'updatedAt'
   })
   @IsString()
   @IsOptional()
-  orderBy?: string;
+  @IsIn(['updatedAt', 'createdAt', 'id'])
+  orderBy?: 'updatedAt' | 'createdAt' | 'id';
 
   @ApiProperty({
     description: 'Order direction',
@@ -56,4 +60,17 @@ export class ListApplicationsDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   orderDirection?: 'asc' | 'desc' = 'desc';
+
+  @ApiProperty({
+    description: 'Filter by application status',
+    required: false,
+    type: [String],
+    enum: ApplicationStatus,
+    example: ['pending', 'approved'],
+    isArray: true
+  })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(ApplicationStatus, { each: true })
+  status?: ApplicationStatus[];
 } 

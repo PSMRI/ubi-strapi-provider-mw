@@ -487,9 +487,12 @@ export class ApplicationsService {
 			);
 		}
 
-		// Revised where clause without search logic
+		// Revised where clause with optional status filtering
 		const whereClause: Prisma.ApplicationsWhereInput = {
 			benefitId: listDto.benefitId,
+			...(listDto.status && listDto.status.length > 0 && {
+				status: { in: listDto.status }
+			}),
 			// Additional conditions can go here
 		};
 
@@ -498,13 +501,22 @@ export class ApplicationsService {
 			where: whereClause,
 		});
 
+		// Validate orderBy field against allowed values to prevent 500 errors
+		const allowedOrderFields = new Set(['updatedAt', 'createdAt', 'id']);
+		const primaryField =
+			listDto.orderBy && allowedOrderFields.has(listDto.orderBy)
+				? listDto.orderBy
+				: 'updatedAt';
+		const direction = listDto.orderDirection ?? 'desc';
+
 		const applications = await this.prisma.applications.findMany({
 			where: whereClause,
-			orderBy: {
-				[listDto.orderBy ?? 'updatedAt']: listDto.orderDirection ?? 'desc',
-			},
-			skip: listDto.offset,
-			take: listDto.limit,
+			orderBy: [
+				{ [primaryField]: direction },
+				{ id: direction }, // tie-breaker for deterministic order
+			],
+			skip: listDto.offset ?? 0,
+			take: Math.min(listDto.limit ?? 20, 100), // Cap at 100 to prevent heavy queries
 		});
 
 		let benefit: BenefitDetail | null = null;

@@ -42,7 +42,7 @@ import { getAuthToken, getBrowserInfo } from 'src/common/util';
 @ApiTags('Applications')
 @Controller('applications')
 export class ApplicationsController {
-	constructor(private readonly applicationsService: ApplicationsService) {}
+	constructor(private readonly applicationsService: ApplicationsService) { }
 
 	@Post()
 	@ApiOperation(ApplicationsApiDocs.create.operation)
@@ -57,29 +57,30 @@ export class ApplicationsController {
 	@ApiBasicAuth('access-token')
 	@UseGuards(AuthGuard)
 	@ApiOperation({
-		summary: 'List applications with pagination and search',
-		description: 'Returns paginated list of applications for a benefit with optional search'
+		summary: 'List applications with pagination and ordering',
+		description: 'Returns paginated list of applications for a benefit with optional ordering by updatedAt or createdAt fields'
 	})
 	@ApiBody({ type: ListApplicationsDto })
 	@ApiResponse({
 		status: 200,
 		description: 'Applications retrieved successfully with pagination metadata'
 	})
+	@ApiResponse({ status: 400, description: 'Missing or invalid parameters' })
 	@UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 	async findAll(@Body() listDto: ListApplicationsDto, @Req() req: Request) {
 		return this.applicationsService.findAll(listDto, req);
 	}
 
-  @Get(':id')
-  @ApiBasicAuth('access-token')
-  @UseGuards(AuthGuard)
-  @ApiOperation(ApplicationsApiDocs.findOne.operation)
-  @ApiParam(ApplicationsApiDocs.findOne.param)
-  @ApiResponse(ApplicationsApiDocs.findOne.responses.success)
-  @ApiResponse(ApplicationsApiDocs.findOne.responses.notFound)
-  async findOne(@Param('id') id: string, @Req() req: Request) {
-    return this.applicationsService.findOne(Number(id), req);
-  }
+	@Get(':id')
+	@ApiBasicAuth('access-token')
+	@UseGuards(AuthGuard)
+	@ApiOperation(ApplicationsApiDocs.findOne.operation)
+	@ApiParam(ApplicationsApiDocs.findOne.param)
+	@ApiResponse(ApplicationsApiDocs.findOne.responses.success)
+	@ApiResponse(ApplicationsApiDocs.findOne.responses.notFound)
+	async findOne(@Param('id') id: string, @Req() req: Request) {
+		return this.applicationsService.findOne(Number(id), req);
+	}
 
 	@Patch(':id')
 	@ApiBasicAuth('access-token')
@@ -192,7 +193,7 @@ export class ApplicationsController {
 	@ApiResponse(ApplicationsApiDocs.calculateBenefit.responses.notFound)
 	async calculateBenefit(@Param('id') id: string, @Req() req: Request) {
 		const authToken = getAuthToken(req);
-		 // auth token is required for the benefit calculation as method is called from cron job
+		// auth token is required for the benefit calculation as method is called from cron job
 		return this.applicationsService.calculateBenefit(Number(id), authToken);
 	}
 
