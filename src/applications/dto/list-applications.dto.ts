@@ -1,34 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsInt, Min, IsString, IsNotEmpty } from 'class-validator';
-// import { Type } from 'class-transformer';
+import { IsOptional, IsInt, Min, Max, IsString, IsNotEmpty, IsIn, IsArray, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApplicationStatus } from './update-application-status.dto';
 
 export class ListApplicationsDto {
-  // @ApiProperty({
-  //   description: 'Page number (starts from 1)',
-  //   required: false,
-  //   default: 1,
-  //   minimum: 1,
-  //   example: 1
-  // })
-  // @Type(() => Number)
-  // @IsInt()
-  // @Min(1)
-  // @IsOptional()
-  // page?: number = 1;
-
-  // @ApiProperty({
-  //   description: 'Number of items per page',
-  //   required: false,
-  //   default: 10,
-  //   minimum: 1,
-  //   example: 10
-  // })
-  // @Type(() => Number)
-  // @IsInt()
-  // @Min(1)
-  // @IsOptional()
-  // limit?: number = 10;
-
   @ApiProperty({
     description: 'Filter by benefit ID',
     required: true,
@@ -37,4 +12,65 @@ export class ListApplicationsDto {
   @IsString()
   @IsNotEmpty()
   benefitId: string;
+
+  @ApiProperty({
+    description: 'Results per page',
+    required: false,
+    default: 20,
+    minimum: 1,
+    maximum: 100,
+    example: 20
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit?: number = 20;
+
+  @ApiProperty({
+    description: 'Records to skip for pagination',
+    required: false,
+    example: 0
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  offset?: number = 0;
+
+  @ApiProperty({
+    description: 'Field to order by',
+    required: false,
+    enum: ['updatedAt', 'createdAt', 'id'],
+    example: 'updatedAt'
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['updatedAt', 'createdAt', 'id'])
+  orderBy?: 'updatedAt' | 'createdAt' | 'id';
+
+  @ApiProperty({
+    description: 'Order direction',
+    required: false,
+    enum: ['asc', 'desc'],
+    example: 'desc'
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  orderDirection?: 'asc' | 'desc' = 'desc';
+
+  @ApiProperty({
+    description: 'Filter by application status',
+    required: false,
+    type: [String],
+    enum: ApplicationStatus,
+    example: ['pending', 'approved'],
+    isArray: true
+  })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(ApplicationStatus, { each: true })
+  status?: ApplicationStatus[];
 } 

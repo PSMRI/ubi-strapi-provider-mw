@@ -473,11 +473,9 @@ export class ApplicationsService {
 	// Get all applications with benefit details
 	async findAll(listDto: ListApplicationsDto, req: Request) {
 		const authToken = getAuthToken(req);
-
-		// Get user from request middleware
 		const userId = (req as any).mw_userid;
 
-		// Check if user can access this application
+		// Check if user can access this benefit
 		const canAccess = await this.aclService.canAccessBenefit(
 			listDto.benefitId,
 			authToken,
@@ -489,14 +487,40 @@ export class ApplicationsService {
 			);
 		}
 
-		const applications = await this.prisma.applications.findMany({
-			where: {
-				benefitId: listDto.benefitId,
-			},
+		// Revised where clause with optional status filtering
+		const whereClause: Prisma.ApplicationsWhereInput = {
+			benefitId: listDto.benefitId,
+			...(listDto.status && listDto.status.length > 0 && {
+				status: { in: listDto.status }
+			}),
+			// Additional conditions can go here
+		};
+
+		// Get total count for the matching applications
+		const total = await this.prisma.applications.count({
+			where: whereClause,
 		});
 
-		// Enrich applications with benefit details
+		// Validate orderBy field against allowed values to prevent 500 errors
+		const allowedOrderFields = new Set(['updatedAt', 'createdAt', 'id']);
+		const primaryField =
+			listDto.orderBy && allowedOrderFields.has(listDto.orderBy)
+				? listDto.orderBy
+				: 'updatedAt';
+		const direction = listDto.orderDirection ?? 'desc';
+
+		const applications = await this.prisma.applications.findMany({
+			where: whereClause,
+			orderBy: [
+				{ [primaryField]: direction },
+				{ id: direction }, // tie-breaker for deterministic order
+			],
+			skip: listDto.offset ?? 0,
+			take: Math.min(listDto.limit ?? 20, 100), // Cap at 100 to prevent heavy queries
+		});
+
 		let benefit: BenefitDetail | null = null;
+		// Enrich applications with benefit details
 		try {
 			const benefitDetail = await this.benefitsService.getBenefitsByIdStrapi(
 				`${listDto.benefitId}`,
@@ -514,7 +538,15 @@ export class ApplicationsService {
 			);
 		}
 
-		return { applications, benefit };
+		return {
+			applications,
+			benefit,
+			pagination: {
+				total,
+				limit: listDto.limit,
+				offset: listDto.offset
+			}
+		};
 	}
 
 	// Get a single application by ID
@@ -765,6 +797,9 @@ export class ApplicationsService {
 			return await this.prisma.applications.findMany({
 				where: {
 					benefitId,
+				},
+				orderBy: {
+					updatedAt: 'desc', // LIFO order: most recently updated first
 				},
 			});
 		} catch (error) {
@@ -1290,6 +1325,9 @@ export class ApplicationsService {
 					eligibilityStatus: {
 						in: ['eligible', 'ineligible'],
 					},
+				},
+				orderBy: {
+					updatedAt: 'desc', // LIFO order: most recently updated first
 				},
 			});
 		} catch (error) {
