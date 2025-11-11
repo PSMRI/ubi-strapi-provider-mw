@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum } from 'class-validator';
 
 export enum ApplicationStatus {
+  INITIATED = 'initiated',
   PENDING = 'pending',
   APPROVED = 'approved',
   REJECTED = 'rejected',

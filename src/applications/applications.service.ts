@@ -137,7 +137,7 @@ export class ApplicationsService {
 		const application = await this.prisma.applications.create({
 			data: {
 				benefitId,
-				status: 'pending',
+				status: 'initiated',
 				customerId,
 				bapId,
 				bapApplicationId,
@@ -384,7 +384,7 @@ export class ApplicationsService {
 		const created = await this.prisma.applications.create({
 			data: {
 				benefitId,
-				status: 'pending',
+				status: 'initiated',
 				customerId,
 				bapId,
 				applicationData: JSON.stringify(normalFields),

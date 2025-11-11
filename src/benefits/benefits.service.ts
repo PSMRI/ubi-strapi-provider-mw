@@ -521,10 +521,10 @@ export class BenefitsService {
 				benefit?.orderId ??
 				`TLEXP_${generateRandomString().toUpperCase()}_${Date.now()}`;
 
-			// Update customer details
+			// Update customer details and set status to pending when orderId is set
 			const orderDetails = await this.applicationsService.update(
 				Number(applicationId),
-				{ orderId },
+				{ orderId, status: 'pending' },
 			);
 
 			if (!orderDetails?.orderId) {
