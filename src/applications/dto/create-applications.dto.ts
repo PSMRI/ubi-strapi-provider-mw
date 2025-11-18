@@ -58,6 +58,14 @@ export class VcDocumentDto {
     message: 'document_content must start with "base64,"'
   })
   document_content: string;
+
+  @ApiProperty({
+    description: 'Name of the document issuer organization',
+    example: 'Government of India'
+  })
+  @IsString()
+  @IsNotEmpty()
+  document_issuer_name: string;
 }
 
 export class CreateApplicationsDto {
