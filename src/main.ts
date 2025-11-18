@@ -19,6 +19,21 @@ async function bootstrap() {
 		}),
 	);
 
+	// Enable CORS only for local development
+	const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+	if (isDevelopment) {
+		app.enableCors({
+			origin: [
+				'http://localhost:5173',
+				'http://localhost:5174',
+			],
+			credentials: true,
+		});
+		console.log('CORS enabled for local development');
+	} else {
+		console.log('CORS disabled for production environment');
+	}
+
 	// Ensure Swagger UI is correctly configured to include Authorization header
 	const config = new DocumentBuilder()
 		.setTitle('API Documentation')
