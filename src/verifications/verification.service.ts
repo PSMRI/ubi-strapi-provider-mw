@@ -108,8 +108,7 @@ export class VerificationService {
           console.error('Failed to parse JSON file:', parseError);
           throw parseError;
         }
-
-        const DEFAULT_ISSUER_NAME = process.env.DEFAULT_ISSUER_NAME?.trim() ?? 'dhiway';
+        const DEFAULT_ISSUER_NAME = (file.issuerName || process.env.DEFAULT_ISSUER_NAME?.trim()) || 'dhiway';
         let issuerName = file.issuerName;
         if (!issuerName || typeof issuerName !== 'string' || issuerName.trim() === '') {
           issuerName = DEFAULT_ISSUER_NAME;
