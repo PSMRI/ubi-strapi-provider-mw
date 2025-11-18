@@ -76,7 +76,7 @@ export class AuthMiddleware implements NestMiddleware {
         next();
 
       } catch (error) {
-        console.error('Something went wrong:', error);
+        console.error('Something went wrong:', error.message);
         req.mw_userid = '';
         next(new UnauthorizedException('Invalid token'));
       }

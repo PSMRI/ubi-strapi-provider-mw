@@ -87,16 +87,14 @@ export class VerificationService {
 
         // Convert Buffer to string first
         const fileContentString = fileContent.toString();
-        console.log('fileContentString:',fileContentString);
 
         // Try to detect if the content is URL-encoded
         let content = fileContentString;
         if (fileContentString.trim().startsWith('%')) {
           try {
             content = decodeURIComponent(fileContentString);
-            console.log('content:',fileContentString);
           } catch (decodeError) {
-            console.error('Failed to decode URI component:', decodeError);
+            console.error('Failed to decode URI component:', decodeError.message);
             throw decodeError;
           }
         }
@@ -105,7 +103,7 @@ export class VerificationService {
         try {
           parsedData = JSON.parse(content);
         } catch (parseError) {
-          console.error('Failed to parse JSON file:', parseError);
+          console.error('Failed to parse JSON file:', parseError.message);
           throw parseError;
         }
 
