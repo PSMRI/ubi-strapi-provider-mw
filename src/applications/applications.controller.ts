@@ -29,7 +29,7 @@ import { ApplicationsService } from './applications.service';
 import { CreateApplicationsDto } from './dto/create-applications.dto';
 import { UpdateApplicationsDto } from './dto/update-applications.dto';
 import { AllExceptionsFilter } from 'src/common/filters/exception.filters';
-import { UpdateApplicationStatusDto } from './dto/update-application-status.dto';
+import { UpdateApplicationStatusDto, ApplicationStatus } from './dto/update-application-status.dto';
 import { ListApplicationsDto } from './dto/list-applications.dto';
 import { ApplicationStatusValidationPipe } from './pipes/application-status-validation.pipe';
 import { AuthGuard } from 'src/auth/auth.guard';
@@ -157,6 +157,7 @@ export class ApplicationsController {
 	})
 	@ApiQuery({ name: 'benefitId', type: String, required: true })
 	@ApiQuery({ name: 'type', type: String, required: true })
+	@ApiQuery({ name: 'status', type: [String], required: false, isArray: true })
 	@ApiResponse({
 		status: 200,
 		description: 'CSV file with applications data',
@@ -165,12 +166,22 @@ export class ApplicationsController {
 	@ApiResponse({ status: 400, description: 'Missing or invalid parameters' })
 	async csvexport(
 		@Query() dto: CsvExportApplicationsDto,
+		@Req() req: Request,
 		@Res() res: Response,
 	) {
 		try {
+			// Handle status[] query parameter (with brackets) - normalize to status array
+			if (!dto.status && req.query['status[]']) {
+				const statusValue = req.query['status[]'];
+				dto.status = Array.isArray(statusValue) 
+					? statusValue as ApplicationStatus[]
+					: [statusValue as ApplicationStatus];
+			}
+
 			const csv = await this.applicationsService.exportApplicationsCsv(
 				dto.benefitId,
 				dto.type,
+				dto.status,
 			);
 
 			res.setHeader('Content-Type', 'text/csv');
