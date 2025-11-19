@@ -36,7 +36,7 @@ export class StrapiAdminService {
       const roles = await this.getCatalogRoles(authToken);
       return roles;
     } catch (error) {
-      console.error('Error fetching roles:', error);
+      console.error('Error fetching roles:', error.message);
       if (error.isAxiosError) {
         throw new HttpException(
           error.response?.data ?? 'Failed to fetch roles',
@@ -79,7 +79,7 @@ export class StrapiAdminService {
         permissions
       };
     } catch (error) {
-      console.error('Error creating role:', error);
+      console.error('Error creating role:', error.message);
       if (error.isAxiosError) {
         throw new HttpException(
           error.response?.data ?? 'Role creation failed',
@@ -246,7 +246,7 @@ export class StrapiAdminService {
 
       return userData;
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error('Error creating user:', error.message);
       if (error.isAxiosError) {
         throw new HttpException(
           error.response?.data ?? 'User creation failed',

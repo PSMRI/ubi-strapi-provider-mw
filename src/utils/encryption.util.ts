@@ -51,7 +51,7 @@ export function decrypt(encryptedValue: string): any {
       return decryptWithKey(encryptedValue, OLD_ENCRYPTION_KEY);
     }
     // Log warning if decryption fails
-    console.warn('Decryption failed for value:', error);
+    console.warn('Decryption failed for value:', error.message);
     return null;
   }
 }

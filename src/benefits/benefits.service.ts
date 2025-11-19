@@ -269,7 +269,7 @@ export class BenefitsService {
 				);
 			}
 
-			console.error('Error in selectBenefitsById:', error);
+			console.error('Error in selectBenefitsById:', error.message);
 			throw new InternalServerErrorException('Failed to select benefit by ID');
 		}
 	}
@@ -382,7 +382,7 @@ export class BenefitsService {
 				);
 			}
 
-			console.error('Error in init:', error);
+			console.error('Error in init:', error.message);
 			throw new InternalServerErrorException('Failed to initialize benefit');
 		}
 	}
@@ -557,7 +557,7 @@ export class BenefitsService {
 				);
 			}
 
-			console.error('Error in confirm:', error);
+			console.error('Error in confirm:', error.message);
 			throw new InternalServerErrorException('Failed to confirm benefit');
 		}
 	}
@@ -569,7 +569,6 @@ export class BenefitsService {
 		);
 		try {
 			const statusData = new StatusResponseDto();
-			console.log("BPP status API:", statusDto);
 			// Extract order ID from the request body
 			const orderId = statusDto?.message?.order_id;
 			console.log('Status check for orderId:', orderId);
@@ -578,7 +577,7 @@ export class BenefitsService {
 			const applicationData = await this.applicationsService.find({
 				orderId,
 			});
-			console.log("BPP status API applicationData:", applicationData);
+			console.log('BPP status API - Application found:', applicationData?.length || 0, 'records');
 			if (!applicationData || applicationData.length === 0) {
 				throw new BadRequestException(
 					'No application found for the given order ID',
@@ -681,7 +680,7 @@ export class BenefitsService {
 				...statusDto.context,
 				...mappedResponse?.context,
 			};
-			console.log("BPP status API statusData:", statusData);
+			console.log('BPP status API - Response prepared successfully');
 			return statusData;
 		} catch (error) {
 			if (error.isAxiosError) {
@@ -692,7 +691,7 @@ export class BenefitsService {
 				);
 			}
 
-			console.error('Error in status:', error);
+			console.error('Error in status:', error.message);
 			throw new InternalServerErrorException('Failed to fetch benefit status');
 		}
 	}

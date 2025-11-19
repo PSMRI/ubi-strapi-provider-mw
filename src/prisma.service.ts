@@ -33,7 +33,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
                 try {
                   obj[field] = JSON.parse(decrypted);
                 } catch (parseError) {
-                  console.error(`Failed to parse JSON for field '${field}' in model '${model}':`, parseError);
+                  console.error(`Failed to parse JSON for field '${field}' in model '${model}':`, parseError.message);
                   obj[field] = {};
                 }
               } else {
@@ -45,7 +45,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
             }
           } catch (e) {
             // Log decryption errors for debugging
-            console.error(`Failed to decrypt field '${field}' in model '${model}':`, e);
+            console.error(`Failed to decrypt field '${field}' in model '${model}':`, e.message);
             obj[field] = null;
           }
         }
@@ -95,7 +95,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
             try {
               dataObj[field] = encrypt(dataObj[field]);
             } catch (e) {
-              console.error(`Failed to encrypt field '${field}' in model '${model}':`, e);
+              console.error(`Failed to encrypt field '${field}' in model '${model}':`, e.message);
               throw new Error(`Encryption failed for field '${field}': ${e.message}`);
             }
           }
