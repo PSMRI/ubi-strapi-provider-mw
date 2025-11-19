@@ -12,6 +12,7 @@ import { Request } from 'express';
 import {
 	UpdateApplicationActionLogDto,
 	UpdateApplicationStatusDto,
+	ApplicationStatus,
 } from './dto/update-application-status.dto';
 import { ListApplicationsDto } from './dto/list-applications.dto';
 import { getAuthToken } from '../common/util';
@@ -740,6 +741,7 @@ export class ApplicationsService {
 	async exportApplicationsCsv(
 		benefitId: string,
 		reportType: string,
+		status?: ApplicationStatus[],
 	): Promise<string> {
 		const reportConfig = reportsConfig[reportType];
 		if (!reportConfig) {
@@ -753,7 +755,7 @@ export class ApplicationsService {
 			applicationTableDataFields = [],
 		} = reportConfig;
 
-		const applications = await this.fetchApplications(benefitId);
+		const applications = await this.fetchApplications(benefitId, status);
 
 		const finalAppDataFields = this.resolveDynamicFields(
 			applications,
@@ -792,12 +794,17 @@ export class ApplicationsService {
 
 	// --- Helper Methods ---
 
-	private async fetchApplications(benefitId: string): Promise<any[]> {
+	private async fetchApplications(benefitId: string, status?: ApplicationStatus[]): Promise<any[]> {
 		try {
+			const whereClause: Prisma.ApplicationsWhereInput = {
+				benefitId,
+				...(status && status.length > 0 && {
+					status: { in: status }
+				}),
+			};
+
 			return await this.prisma.applications.findMany({
-				where: {
-					benefitId,
-				},
+				where: whereClause,
 				orderBy: {
 					updatedAt: 'desc', // LIFO order: most recently updated first
 				},
