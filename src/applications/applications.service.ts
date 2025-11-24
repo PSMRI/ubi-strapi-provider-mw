@@ -280,6 +280,7 @@ export class ApplicationsService {
 					document_submission_reason: doc.document_submission_reason,
 					document_subtype: doc.document_subtype,
 					document_type: doc.document_type,
+					document_issuer_name: doc.document_issuer_name,
 				}
 			});
 		});
@@ -444,6 +445,7 @@ export class ApplicationsService {
 					fileData.documentSubmissionReason = metadata.document_submission_reason;
 					fileData.documentSubtype = metadata.document_subtype;
 					fileData.documentType = metadata.document_type;
+					fileData.issuerName = metadata.document_issuer_name;
 				}
 
 				// Save uploaded file info in applicationFiles table

@@ -84,7 +84,6 @@ export class EligibilityStatusUpdate {
 					});
 				}
 			} catch (err) {
-				console.log(err)
 				Logger.warn(
 					`Failed to process application ${application.id}: ${err.message}`
 				);

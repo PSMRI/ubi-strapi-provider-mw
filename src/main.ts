@@ -19,6 +19,27 @@ async function bootstrap() {
 		}),
 	);
 
+	// Enable CORS only for explicit development environment
+	const isDevelopment = process.env.NODE_ENV === 'development';
+	
+	// Warn if NODE_ENV is undefined (safer default behavior)
+	if (!process.env.NODE_ENV) {
+		console.warn('Warning: NODE_ENV is undefined. Defaulting to production mode (CORS disabled) for security.');
+	}
+	
+	if (isDevelopment) {
+		app.enableCors({
+			origin: [
+				'http://localhost:5173',
+				'http://localhost:5174',
+			],
+			credentials: true,
+		});
+		console.log('CORS enabled for development environment');
+	} else {
+		console.log('CORS disabled for production/non-development environment');
+	}
+
 	// Ensure Swagger UI is correctly configured to include Authorization header
 	const config = new DocumentBuilder()
 		.setTitle('API Documentation')
