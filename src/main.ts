@@ -75,7 +75,8 @@ async function bootstrap() {
 		},
 	});
 
-	console.log('process.env.PORT-->>', process.env.PORT);
-	await app.listen(process.env.PORT ?? 3000);
+	// Bind to all interfaces inside the container; avoid logging env in prod
+	const port = parseInt(process.env.PORT ?? '', 10) || 7000;
+	await app.listen(port, '0.0.0.0');
 }
 bootstrap();
