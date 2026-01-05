@@ -247,6 +247,7 @@ export class BenefitsService {
 		this.checkBapIdAndUri(body?.context?.bap_id, body?.context?.bap_uri);
 		try {
 			let id = body.message.order.items[0].id;
+			console.log('[on_select] Entry - benefitId:', id, 'transactionId:', body?.context?.transaction_id);
 
 			const response = await this.getBenefitsByIdStrapi(id);
 			let mappedResponse;
@@ -258,6 +259,7 @@ export class BenefitsService {
 				);
 			}
 
+			console.log('[on_select] Exit - benefitId:', body.message.order.items[0].id, 'Success');
 			return mappedResponse;
 
 		} catch (error) {
@@ -282,6 +284,8 @@ export class BenefitsService {
 		);
 
 		try {
+			console.log('[on_init] Entry - transactionId:', initRequestDto?.context?.transaction_id, 'benefitId:', initRequestDto?.message?.order?.items?.[0]?.id);
+			
 			// Extract applicationData from the payload
 			const applicationData = initRequestDto?.message?.order?.fulfillments?.[0]?.customer?.applicationData;
 
@@ -361,6 +365,7 @@ export class BenefitsService {
 			items[0].applicationId = applicationId;
 			items[0].transactionId = transactionId;
 
+			console.log('[on_init] Exit - applicationId:', applicationId, 'transactionId:', transactionId, 'benefitId:', benefitId, 'Success');
 			return {
 				context: {
 					...initRequestDto.context,
@@ -397,6 +402,8 @@ export class BenefitsService {
 			data?.context?.bap_uri,
 		);
 
+		console.log('[on_update] Entry - transactionId:', data?.context?.transaction_id, 'applicationId:', data?.message?.order?.fulfillments?.[0]?.customer?.applicationData?.orderId);
+		
 		// Extract transaction_id from context
 		const transactionId = data?.context?.transaction_id;
 		if (!transactionId) {
@@ -473,6 +480,8 @@ export class BenefitsService {
 		items[0].applicationId = applicationId;
 		items[0].transactionId = transactionId;
 
+		console.log('[on_update] Exit - applicationId:', applicationId, 'transactionId:', transactionId, 'benefitId:', benefitId, 'Success');
+		
 		// Return context and message - responses[0] will come from network layer
 		return {
 			context: {
@@ -494,6 +503,8 @@ export class BenefitsService {
 			confirmDto?.context?.bap_uri,
 		);
 		try {
+			console.log('[on_confirm] Entry - transactionId:', confirmDto?.context?.transaction_id, 'applicationId:', confirmDto.message.order.items[0].id);
+			
 			const confirmData = new ConfirmResponseDto();
 			const applicationId = confirmDto.message.order.items[0].id; // from frontend will be received after save application
 
@@ -547,6 +558,7 @@ export class BenefitsService {
 				...mappedResponse?.context,
 			};
 
+			console.log('[on_confirm] Exit - applicationId:', applicationId, 'orderId:', orderDetails.orderId, 'benefitId:', benefit.benefitId, 'Success');
 			return confirmData;
 		} catch (error) {
 			if (error.isAxiosError) {
@@ -571,13 +583,13 @@ export class BenefitsService {
 			const statusData = new StatusResponseDto();
 			// Extract order ID from the request body
 			const orderId = statusDto?.message?.order_id;
-			console.log('Status check for orderId:', orderId);
+			console.log('[on_status] Entry - orderId:', orderId, 'transactionId:', statusDto?.context?.transaction_id);
 
 			// Fetch application details using the order ID
 			const applicationData = await this.applicationsService.find({
 				orderId,
 			});
-			console.log('BPP status API - Application found:', applicationData?.length || 0, 'records');
+			console.log('[on_status] Application found:', applicationData?.length || 0, 'records');
 			if (!applicationData || applicationData.length === 0) {
 				throw new BadRequestException(
 					'No application found for the given order ID',
@@ -680,7 +692,7 @@ export class BenefitsService {
 				...statusDto.context,
 				...mappedResponse?.context,
 			};
-			console.log('BPP status API - Response prepared successfully');
+			console.log('[on_status] Exit - orderId:', orderId, 'applicationId:', application.id, 'status:', status, 'Success');
 			return statusData;
 		} catch (error) {
 			if (error.isAxiosError) {
