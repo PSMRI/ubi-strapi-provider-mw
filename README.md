@@ -1,6 +1,6 @@
 # UBI Strapi Provider Middleware (ubi-strapi-provider-mw)
 
-Middleware layer between external systems and Strapi CMS
+Middleware layer between external systems and Strapi CMS.
 
 ## Resources
 
