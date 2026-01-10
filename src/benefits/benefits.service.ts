@@ -78,6 +78,75 @@ export class BenefitsService {
 		const locale = body?.locale ?? 'en';
 		const filters = body?.filters ?? {};
 
+		// Get user information from request
+		const userId = (req as any).mw_userid;
+		let isSuperAdmin = false;
+		let userRoles: string[] = [];
+
+		if (userId) {
+			try {
+				const user = await this.prisma.users.findUnique({
+					where: { id: Number(userId) },
+				});
+
+				if (user) {
+					// Check if user is Super Admin
+					isSuperAdmin = user.s_roles?.includes('Super Admin') || false;
+					userRoles = user.s_roles || [];
+				}
+			} catch (error) {
+				console.error('Error fetching user information:', error);
+				throw new InternalServerErrorException('Failed to fetch user information');
+			}
+		}
+
+		// If not Super Admin, filter benefits by provider (same roles)
+		if (!isSuperAdmin && userRoles.length > 0) {
+			// Get all users from the same provider (same roles) - EXCLUDE Super Admin users
+			const providerUsers = await this.prisma.users.findMany({
+				where: {
+					AND: [
+						{
+							s_roles: {
+								hasSome: userRoles,
+							},
+						},
+						{
+							// Exclude users who have Super Admin role
+							NOT: {
+								s_roles: {
+									has: 'Super Admin',
+								},
+							},
+						},
+					],
+				},
+				select: { s_id: true },
+			});
+
+			const providerUserIds = providerUsers.map(user => user.s_id);
+
+			// Add filter to only show benefits created by users from the same provider
+			if (providerUserIds.length > 0) {
+				filters.createdBy = {
+					id: {
+						$in: providerUserIds,
+					},
+				};
+			} else {
+				// If no provider users found, return empty results
+				return {
+					results: [],
+					pagination: {
+						page: Number(page),
+						pageSize: Number(pageSize),
+						pageCount: 0,
+						total: 0,
+					},
+				};
+			}
+		}
+
 		const queryParams = {
 			page,
 			pageSize,
@@ -91,7 +160,7 @@ export class BenefitsService {
 			arrayFormat: 'brackets',
 		});
 
-		// Call to the Strapi API to get the benefits
+		// Call to the Strapi API to get the benefits with provider filtering
 		const url = `${this.strapiUrl}/content-manager/collection-types/api::benefit.benefit?${queryString}`;
 
 		const headers = {
@@ -186,8 +255,81 @@ export class BenefitsService {
 	async getBenefitsById(id: string, req: Request): Promise<any> {
 		try {
 			const authToken = getAuthToken(req);
-			const response = await this.getBenefitsByIdStrapi(id, authToken);
-			return response.data;
+			
+			// Get user information from request
+			const userId = (req as any).mw_userid;
+			let isSuperAdmin = false;
+
+			if (userId) {
+				try {
+					const user = await this.prisma.users.findUnique({
+						where: { id: Number(userId) },
+					});
+
+					if (user) {
+						// Check if user is Super Admin
+						isSuperAdmin = user.s_roles?.includes('Super Admin') || false;
+					}
+				} catch (error) {
+					console.error('Error fetching user information:', error);
+					throw new InternalServerErrorException('Failed to fetch user information');
+				}
+			}
+
+			let benefitResponse;
+
+			// If not Super Admin, check if the user can access this specific benefit
+			if (!isSuperAdmin && userId) {
+				// Get the benefit data to check createdBy
+				benefitResponse = await this.getBenefitsByIdStrapi(id, authToken);
+				const benefitData = benefitResponse?.data?.data;
+
+				if (benefitData?.createdBy?.id) {
+					// Get the user who created the benefit
+					const benefitCreator = await this.prisma.users.findFirst({
+						where: { s_id: String(benefitData.createdBy.id) },
+					});
+
+					if (benefitCreator) {
+						// Check if the benefit creator is a Super Admin
+						const creatorIsSuperAdmin = benefitCreator.s_roles?.includes('Super Admin') || false;
+						
+						if (creatorIsSuperAdmin) {
+							// Non-Super Admin users cannot access benefits created by Super Admin
+							throw new HttpException(
+								'You do not have permission to access this benefit',
+								HttpStatus.FORBIDDEN,
+							);
+						}
+
+						// Get current user
+						const currentUser = await this.prisma.users.findUnique({
+							where: { id: Number(userId) },
+						});
+
+						if (currentUser) {
+							// Check if users share any roles (same provider) and neither is Super Admin
+							const currentUserRoles = currentUser.s_roles || [];
+							const creatorRoles = benefitCreator.s_roles || [];
+							const hasCommonRole = currentUserRoles.some(role => creatorRoles.includes(role));
+
+							if (!hasCommonRole) {
+								throw new HttpException(
+									'You do not have permission to access this benefit',
+									HttpStatus.FORBIDDEN,
+								);
+							}
+						}
+					}
+				}
+			}
+
+			// Reuse the response if already fetched, otherwise fetch it
+			if (!benefitResponse) {
+				benefitResponse = await this.getBenefitsByIdStrapi(id, authToken);
+			}
+
+			return benefitResponse.data;
 		} catch (error) {
 			if (error.isAxiosError) {
 				// Handle AxiosError and rethrow as HttpException
